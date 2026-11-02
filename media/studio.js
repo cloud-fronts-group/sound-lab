@@ -110,7 +110,7 @@
     if (!T) { drawer.hidden = true; S.tool = ''; save(); vscode.postMessage({ type: 'tool', tool: '' }); return; }
     S.tool = tool; save(); vscode.postMessage({ type: 'tool', tool });
     const v = vals(tool);
-    if (track) { v[T.fields.find(f => f.type === 'file')?.k || 'track'] = track; }
+    if (track) { const k = T.fields.find(f => f.type === 'file')?.k || 'track'; if (v[k] !== track) { v[k] = track; if (k === 'track') { delete v.bpm; } if (k === 'trackB') { delete v.bpmB; } } }
     if (tool === 'layer' && !v.part && S.lastPart) { v.part = S.lastPart; }
     T.fields.forEach(f => { if (v[f.k] === undefined && f.def !== undefined) { v[f.k] = f.def; } });
     drawer.innerHTML = `
@@ -128,6 +128,7 @@
     // re-show analyses for files already chosen
     T.fields.filter(f => f.type === 'file' && f.bpmKey && v[f.k]).forEach(f => analyse(tool, f.k));
     if (lastResult[tool]) { showResult(lastResult[tool]); }
+    if (busy.has(tool)) { /** @type {HTMLButtonElement} */ ($('go')).disabled = true; $('prog').hidden = false; status('Working…'); }
   }
 
   function wire(/** @type {string} */ tool) {
@@ -189,6 +190,8 @@
 
   /** @type {Record<string, any>} */
   const lastResult = {};
+  /** @type {Set<string>} tools with a job running (survives drawer re-renders) */
+  const busy = new Set();
   function showResult(/** @type {any} */ r) {
     const box = $('result'); if (!box) { return; }
     const T = TOOLS[r.tool];
@@ -241,13 +244,14 @@
     switch (m.type) {
       case 'show': open(m.tool, m.track); break;
       case 'picked': {
-        const tool = S.tool; if (!tool) { break; }
+        const tool = m.tool || S.tool; if (!tool || !TOOLS[tool]) { break; }
         setFile(tool, m.field, m.file);
         break;
       }
-      case 'analysing': { const box = drawer.querySelector(`[data-an="${m.field}"]`); if (box) { box.textContent = 'Detecting tempo, beat grid and key…'; } break; }
-      case 'analysed': showAnalysis(m); break;
+      case 'analysing': { if (m.tool && m.tool !== S.tool) { break; } const box = drawer.querySelector(`[data-an="${m.field}"]`); if (box) { box.textContent = 'Detecting tempo, beat grid and key…'; } break; }
+      case 'analysed': if (!m.tool || (m.tool === S.tool && vals(m.tool)[m.field] === m.file)) { showAnalysis(m); } break;
       case 'busy': {
+        if (m.on) { busy.add(m.tool); } else { busy.delete(m.tool); }
         if (m.tool !== S.tool) { break; }
         const go = /** @type {HTMLButtonElement|null} */ (document.getElementById('go')); if (go) { go.disabled = m.on; }
         $('prog').hidden = !m.on; if (m.on) { $('bar').style.width = '2%'; status('Working…'); }

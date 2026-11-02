@@ -122,7 +122,7 @@ export function beatJump(a: Analysed, o: { at?: number; beats?: number } = {}): 
   const to = at + beats * g.period;
   if (to < 0 || to >= g.duration - 0.1) { throw new Error(`A ${beats > 0 ? '+' : ''}${beats}-beat jump from ${tc(at)} leaves the track.`); }
   const head = slice(a.buf, 0, at), rest = slice(a.buf, to, g.duration);
-  const xf = Math.min(Math.round(0.006 * SR), head.length, rest.length);
+  const xf = Math.min(Math.round(0.006 * SR), head.length, rest.length, Math.round(to * SR));
   // crossfade the last xf samples of head with the first xf of the jump target (equal-power)
   const pre = slice(a.buf, to - xf / SR, to);
   for (let i = 0; i < xf; i++) {
@@ -146,8 +146,11 @@ function bands(b: Stereo, cutoff = 180): { low: Stereo; high: Stereo } {
 }
 
 /** Tempo-match B to A at decode time (pitch-preserving atempo), with an optional key shift in semitones. */
-export async function analyseMatched(t: Tools, file: string, toBpm: number, o: { bpm?: number; semitones?: number; signal?: AbortSignal; key?: boolean } = {}): Promise<Analysed & { ratio: number; srcBpm: number }> {
-  const raw = await analyse(t, file, { bpm: o.bpm, key: o.key, signal: o.signal });
+export async function analyseMatched(t: Tools, file: string, toBpm: number, o: { bpm?: number; semitones?: number; signal?: AbortSignal; key?: boolean; srcGrid?: BeatGrid } = {}): Promise<Analysed & { ratio: number; srcBpm: number }> {
+  // srcGrid: the tempo is already known (e.g. an acapella shares the full song's grid) — never re-detect on beatless audio
+  const raw: Analysed = o.srcGrid
+    ? { file, buf: await decode(t.ffmpeg, file, { signal: o.signal }), grid: o.srcGrid }
+    : await analyse(t, file, { bpm: o.bpm, key: o.key, signal: o.signal });
   // fold half/double-time so a 70 BPM track mixes with a 140 BPM one
   let src = raw.grid.bpm;
   while (src / toBpm > 1.45) { src /= 2; } while (toBpm / src > 1.45) { src *= 2; }
@@ -200,7 +203,7 @@ export function transition(a: Analysed, b: Analysed, o: TransitionOptions): { bu
   const total = Math.max(at + len, off + b.grid.duration);
   const out = new Stereo(Math.round(total * SR));
   const A = bands(a.buf), B = bands(b.buf);
-  const s0 = Math.round(at * SR), s1 = Math.round((at + len) * SR), mid = Math.round((at + Math.round(bars / 2) * 4 * g.period) * SR);
+  const s0 = Math.round(at * SR), s1 = Math.round((at + len) * SR), mid = Math.round((at + (bars >= 2 ? Math.round(bars / 2) * 4 : bars * 2) * g.period) * SR);
   const offS = Math.round(off * SR);
   for (let i = 0; i < out.length; i++) {
     const x = i < s0 ? 0 : i >= s1 ? 1 : (i - s0) / (s1 - s0);
