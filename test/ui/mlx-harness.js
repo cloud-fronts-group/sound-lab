@@ -1,5 +1,5 @@
 // End-to-end check of the mlx-audio experience WITHOUT VS Code: the real extension-side classes (MlxController,
-// MlxPanelProvider, VoiceCloneWizard, StudioPanel) run against a mocked `vscode` module, a mock mlx-audio server,
+// MlxPanelProvider, VoiceCloneWizard, StudioPanel + StudioTools) run against a mocked `vscode` module, a mock mlx-audio server,
 // ffmpeg (a lavfi "voice" stands in for the microphone) and — when available — the real mlx-audio Studio dev server.
 // The webviews render in Chromium with their real CSP; messages flow both ways. Screenshots → test/ui/out/.
 //
@@ -62,6 +62,7 @@ function loadPlaywright() {
       showWarningMessage: async (msg, ...a) => a.filter(x => typeof x === 'string')[0],
       showErrorMessage: async (m) => { console.log('   [error message]', m); },
       showOpenDialog: async () => dialogQueue.shift(),
+      showQuickPick: async (items) => (await items)[0],
       withProgress: async (_o, task) => task({ report() {} }, { onCancellationRequested() {} }),
       visibleTextEditors: [], activeTextEditor: undefined,
     },
@@ -186,12 +187,142 @@ const THEME = `<style>:root{--vscode-foreground:#cccccc;--vscode-editor-backgrou
   await wiz.click('#create');
   check(await waitFor(() => wiz.evaluate(() => [...document.querySelectorAll('#results .item span')].some(s => /vocal stem/.test(s.textContent))), 60000, 'vocals done'), 'vocals mixed over the instrumental (+ vocal stem)');
 
-  // ------------------------------------------------------------ 3. Studio embedded
+
+  // ------------------------------------------------------------ 3. Sound Lab Studio tools (Create + DJ)
+  const { StudioTools } = require(path.join(ROOT, 'out', 'studioTools'));
+  const { runOk } = require(path.join(ROOT, 'out', 'core', 'ffmpeg'));
+  const studioTools = new StudioTools(mlx);
+  await StudioPanel.open(mlx, ctx, studioTools, { tool: 'beats' });
+  const sp = panels.find(p => p.id === 'soundLab.mlxStudio');
+  check(sp.title === 'Sound Lab Studio', 'panel is titled "Sound Lab Studio"');
+  const st = await mount(sp.webview, path.join(work, 'studio-tools.html'), { width: 1440, height: 900 });
+  const ribbon = await st.$$eval('.tool', bs => bs.map(b => ({ t: b.dataset.tool, label: b.textContent.trim(), icon: !!b.querySelector('svg use') })));
+  check(ribbon.filter(r => ['instrumental', 'beats', 'chords', 'sfx', 'autotune', 'layer'].includes(r.t)).length === 6 && ribbon.every(r => r.icon), `Create ribbon: ${ribbon.slice(0, 6).map(r => r.label).join(', ')}`);
+  check(['backspin', 'echoout', 'beatjump', 'doubledrop', 'quickmix', 'longblend', 'mashup', 'acapella', 'novocals'].every(t => ribbon.some(r => r.t === t && r.icon)), `DJ ribbon: ${ribbon.slice(6).map(r => r.label).join(', ')}`);
+  check(await st.isVisible('#drawer') && /Beats/.test(await st.textContent('#drawer h2')), 'the command opened the Beats drawer');
+  const result = async (tool, what, ms = 90000) => {
+    const ok = await waitFor(() => st.evaluate(t => !!document.querySelector('#result audio') && !document.getElementById('go').disabled && (window.__lastTool = t), tool), ms, what);
+    return ok ? st.evaluate(() => ({ name: document.querySelector('#result b').textContent, detail: document.querySelector('#result .muted').textContent, src: document.querySelector('#result audio').getAttribute('src'), stems: document.querySelectorAll('#result .stem audio').length })) : null;
+  };
+  const playable = () => st.evaluate(() => new Promise(r => { const a = document.querySelector('#result audio'); if (a.readyState >= 1) { r(a.duration); } a.onloadedmetadata = () => r(a.duration); a.onerror = () => r(-1); setTimeout(() => r(-2), 5000); }));
+
+  await st.selectOption('[data-k="style"]', 'trap');
+  check(await st.inputValue('#s-bpm') === '140', 'choosing Trap sets the session tempo to 140');
+  await st.click('#go');
+  let res = await result('beats', 'beats result');
+  check(res && /Trap · 140 BPM · 4 bars/.test(res.detail), `beats generated: ${res && res.name} — ${res && res.detail}`);
+  check(Math.abs((await playable()) - 4 * 4 * 60 / 140) < 0.01, 'the beat loop plays in the drawer (6.857 s)');
+  check(fs.readdirSync(path.join(work, 'sound-lab-studio', 'beats')).some(f => /^trap-140bpm.*\.wav$/.test(f)), 'saved under sound-lab-studio/beats/');
+  await st.screenshot({ path: path.join(OUT, 'studio-beats.png') });
+
+  await st.click('[data-tool="instrumental"]');
+  await st.selectOption('[data-k="genre"]', 'lofi');
+  await st.selectOption('[data-k="bars"]', '8');
+  await st.selectOption('#s-key', 'D');
+  await st.selectOption('#s-scale', 'major');
+  await st.click('#go');
+  res = await result('instrumental', 'instrumental result');
+  check(res && /Lo-fi · D major · 80 BPM · 8 bars/.test(res.detail), `instrumental composed: ${res && res.detail}`);
+  const instFile = path.join(work, 'sound-lab-studio', 'instrumentals', fs.readdirSync(path.join(work, 'sound-lab-studio', 'instrumentals'))[0]);
+  await st.screenshot({ path: path.join(OUT, 'studio-instrumental.png') });
+
+  await st.click('[data-tool="chords"]');
+  await st.fill('[data-k="customProg"]', 'Dmaj7 Bm7 Em7 A7');
+  await st.selectOption('[data-k="rhythm"]', 'arp');
+  await st.click('#go');
+  res = await result('chords', 'chords result');
+  check(res && /Dmaj7 → Bm7 → Em7 → A7/.test(res.detail), `chords from typed symbols: ${res && res.detail}`);
+
+  await st.click('[data-tool="sfx"]');
+  await st.selectOption('[data-k="effect"]', 'riser');
+  await st.selectOption('[data-k="sfxBars"]', '2');
+  await st.click('#go');
+  res = await result('sfx', 'sfx result');
+  check(res && /Riser .* 6\.00 s/.test(res.detail), `2-bar riser at 80 BPM = 6 s: ${res && res.detail}`);
+  // Layer onto…: the riser goes onto the instrumental
+  await st.click('#result [data-layer]');
+  check(/Layer/.test(await st.textContent('#drawer h2')) && /riser/.test(await st.textContent('[data-file="part"] .fname')), 'Layer onto… opens the Layer drawer with the part filled in');
+  dialogQueue.push([Uri.file(instFile)]);
+  await st.click('[data-pick="target"]');
+  await waitFor(() => st.evaluate(() => /lofi/.test(document.querySelector('[data-file="target"] .fname').textContent)), 5000, 'target picked');
+  await st.click('#go');
+  res = await result('layer', 'layer result');
+  check(res && /riser.*→.*lofi.*looped/.test(res.detail), `layered: ${res && res.detail}`);
+
+  // Auto-tune a sharp "vocal" (450 Hz) — key detection on, natural retune
+  const vox = path.join(work, 'vocal take.wav');
+  await runOk({ exe: 'ffmpeg', args: ['-y', '-v', 'error', '-f', 'lavfi', '-i', "aevalsrc='0.3*(sin(2*PI*450*t)+0.5*sin(4*PI*450*t))*lt(mod(t,1),0.8)':s=44100:d=3", vox] });
+  await st.click('[data-tool="autotune"]');
+  dialogQueue.push([Uri.file(vox)]);
+  await st.click('[data-pick="track"]');
+  await waitFor(() => st.evaluate(() => /vocal take/.test(document.querySelector('[data-file="track"] .fname').textContent)), 5000, 'vocal picked');
+  await st.click('[data-k="detectKey"]');   // off → use the session key (D major contains A)
+  await st.click('#go');
+  res = await result('autotune', 'auto-tune result');
+  check(res && /D major · retune 40 ms .* → [0-9] cents/.test(res.detail), `auto-tuned: ${res && res.detail}`);
+  check(fs.existsSync(path.join(work, 'vocal take_autotuned.wav')), 'auto-tune output written next to the source');
+  await st.screenshot({ path: path.join(OUT, 'studio-autotune.png') });
+
+  // DJ: backspin on the instrumental — analysis shows tempo + key; ×2/÷2 present
+  await st.click('[data-tool="backspin"]');
+  dialogQueue.push([Uri.file(instFile)]);
+  await st.click('[data-pick="track"]');
+  await waitFor(() => st.evaluate(() => /BPM/.test(document.querySelector('[data-an="track"]').textContent)), 20000, 'analysis');
+  const an = await st.textContent('[data-an="track"]');
+  check(/(80|160)(\.\d+)? BPM/.test(an) && /major|minor/.test(an), `track analysed: ${an.replace(/\s+/g, ' ').trim()}`);
+  await st.fill('[data-k="at"]', '0:06');
+  await st.click('#go');
+  res = await result('backspin', 'backspin result');
+  check(res && /Backspin at 0:06\.000/.test(res.detail), `backspin on the beat: ${res && res.detail}`);
+  await st.screenshot({ path: path.join(OUT, 'studio-dj-backspin.png') });
+
+  // Quick mix the instrumental into the trap beat
+  await st.click('[data-tool="quickmix"]');
+  dialogQueue.push([Uri.file(instFile)]);
+  await st.click('[data-pick="track"]');
+  await waitFor(() => st.evaluate(() => /BPM/.test(document.querySelector('[data-an="track"]').textContent)), 20000, 'analysis A');
+  const beatFile = path.join(work, 'sound-lab-studio', 'beats', fs.readdirSync(path.join(work, 'sound-lab-studio', 'beats'))[0]);
+  dialogQueue.push([Uri.file(beatFile)]);
+  await st.click('[data-pick="trackB"]');
+  await waitFor(() => st.evaluate(() => /BPM/.test(document.querySelector('[data-an="trackB"]').textContent)), 20000, 'analysis B');
+  await st.click('#go');
+  res = await result('quickmix', 'quick mix result');
+  check(res && /Quick mix .*lofi.* → trap.* over 1 bar/.test(res.detail) && /stretched/.test(res.detail), `quick mix, tempo-matched: ${res && res.detail}`);
+  await st.screenshot({ path: path.join(OUT, 'studio-dj-quickmix.png') });
+
+  // Acapella through mlx-audio (the mock server is running) → both stems listed
+  await st.click('[data-tool="acapella"]');
+  dialogQueue.push([Uri.file(instFile)]);
+  await st.click('[data-pick="track"]');
+  await waitFor(() => st.evaluate(() => /lofi/.test(document.querySelector('[data-file="track"] .fname').textContent)), 5000, 'picked');
+  await st.click('#go');
+  res = await result('acapella', 'acapella result');
+  check(res && /via mlx-audio separation/.test(res.detail) && res.stems === 1, `acapella via mlx-audio (+ instrumental stem): ${res && res.detail}`);
+  // and the built-in center extractor when separation is forced to "center"
+  settings['dj.separation'] = 'center';
+  await st.click('[data-tool="novocals"]');
+  dialogQueue.push([Uri.file(instFile)]);
+  await st.click('[data-pick="track"]');
+  await waitFor(() => st.evaluate(() => /lofi/.test(document.querySelector('[data-file="track"] .fname').textContent)), 5000, 'picked');
+  await st.click('#go');
+  res = await result('novocals', 'instrumental result');
+  check(res && /center-channel extraction/.test(res.detail), `instrumental via center extraction: ${res && res.detail}`);
+  await st.screenshot({ path: path.join(OUT, 'studio-dj-stems.png') });
+  await st.close();
+
+  // one-click commands (explorer / editor path): editor playhead → {at}; explorer multi-select → two tracks
+  await studioTools.cmdDj('echoout', Uri.file(instFile), { at: 9 });
+  check(fs.readdirSync(path.dirname(instFile)).some(f => /_echo-out\.wav$/.test(f)), 'DJ: Echo Out command (at the editor playhead) writes <name>_echo-out.wav');
+  await studioTools.cmdDj('longblend', Uri.file(instFile), [Uri.file(instFile), Uri.file(beatFile)]);
+  check(fs.readdirSync(path.dirname(instFile)).some(f => /_long-blend-trap/.test(f)), 'DJ: Long Blend on two selected files writes <A>_long-blend-<B>');
+  await studioTools.cmdAutoTune(Uri.file(vox));
+  check(fs.existsSync(path.join(work, 'vocal take_autotuned-1.wav')), 'Auto-tune Vocals command (Natural preset) writes a second, uniquely named take');
+
+  // ------------------------------------------------------------ 4. mlx-audio Studio embedded
   const studioDir = argStudio && fs.existsSync(path.join(argStudio, 'node_modules', '.bin', 'next')) ? argStudio : null;
   if (studioDir) {
     fs.writeFileSync(path.join(studioDir, 'node_modules', '.soundlab-installed'), 'harness');
-    await StudioPanel.open(mlx, ctx);
-    const sp = panels.find(p => p.id === 'soundLab.mlxStudio');
+    await StudioPanel.open(mlx, ctx, studioTools, { startStudio: true });
     check(new RegExp(`frame-src http://localhost:${studioPort}`).test(sp.webview.html), 'Studio CSP allows exactly the Studio origin in frame-src');
     const st = await mount(sp.webview, path.join(work, 'studio.html'), { width: 1280, height: 860 });
     const frame = await (await st.waitForSelector('#studio')).contentFrame();
