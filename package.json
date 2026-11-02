@@ -352,7 +352,7 @@
       },
       {
         "command": "soundLab.mlxOpenStudio",
-        "title": "Open mlx-audio Studio",
+        "title": "Open mlx-audio Studio (in Sound Lab Studio)",
         "category": "Sound Lab",
         "icon": {
           "light": "media/icons/studio-light.svg",
@@ -367,12 +367,169 @@
           "light": "media/icons/server-stop-light.svg",
           "dark": "media/icons/server-stop-dark.svg"
         }
+      },
+      {
+        "command": "soundLab.openStudio",
+        "title": "Open Sound Lab Studio",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/studio-light.svg",
+          "dark": "media/icons/studio-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addInstrumental",
+        "title": "Studio: Add Instrumental…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/instrumental-light.svg",
+          "dark": "media/icons/instrumental-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addBeats",
+        "title": "Studio: Add Beats…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/beats-light.svg",
+          "dark": "media/icons/beats-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addChords",
+        "title": "Studio: Add Chords…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/chords-light.svg",
+          "dark": "media/icons/chords-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addSoundFx",
+        "title": "Studio: Add Sound FX…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/sfx-light.svg",
+          "dark": "media/icons/sfx-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.layerOnto",
+        "title": "Studio: Layer a Part onto This Track…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/layers-light.svg",
+          "dark": "media/icons/layers-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.autoTune",
+        "title": "Auto-tune Vocals…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/autotune-light.svg",
+          "dark": "media/icons/autotune-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.detectTempoKey",
+        "title": "Detect Tempo & Key",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/detect-light.svg",
+          "dark": "media/icons/detect-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djBackspin",
+        "title": "DJ: Backspin",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/backspin-light.svg",
+          "dark": "media/icons/backspin-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djEchoOut",
+        "title": "DJ: Echo Out",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/echo-out-light.svg",
+          "dark": "media/icons/echo-out-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djBeatJump",
+        "title": "DJ: Beat Jump…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/beat-jump-light.svg",
+          "dark": "media/icons/beat-jump-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djDoubleDrop",
+        "title": "DJ: Double Drop…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/double-drop-light.svg",
+          "dark": "media/icons/double-drop-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djQuickMix",
+        "title": "DJ: Quick Mix…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/quick-mix-light.svg",
+          "dark": "media/icons/quick-mix-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djLongBlend",
+        "title": "DJ: Long Blend…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/long-blend-light.svg",
+          "dark": "media/icons/long-blend-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djMashup",
+        "title": "DJ: Mashup…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/mashup-light.svg",
+          "dark": "media/icons/mashup-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djAcapella",
+        "title": "DJ: Acapella (isolate vocals)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/acapella-light.svg",
+          "dark": "media/icons/acapella-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djInstrumental",
+        "title": "DJ: Instrumental (remove vocals)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/no-vocals-light.svg",
+          "dark": "media/icons/no-vocals-dark.svg"
+        }
       }
     ],
     "submenus": [
       {
         "id": "soundLab.explorerMenu",
         "label": "Sound Lab"
+      },
+      {
+        "id": "soundLab.djMenu",
+        "label": "Sound Lab DJ"
       }
     ],
     "menus": {
@@ -482,6 +639,26 @@
         {
           "command": "soundLab.mlxSeparate",
           "group": "5_speech@3",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.autoTune",
+          "group": "6_studio@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.layerOnto",
+          "group": "6_studio@2",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.detectTempoKey",
+          "group": "6_studio@3",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "submenu": "soundLab.djMenu",
+          "group": "6_studio@4",
           "when": "!explorerResourceIsFolder"
         }
       ],
@@ -627,6 +804,16 @@
           "command": "soundLab.mlxSeparate",
           "when": "view == soundLab.samples && viewItem == soundLab.file",
           "group": "5_speech@2"
+        },
+        {
+          "command": "soundLab.autoTune",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "6_studio@1"
+        },
+        {
+          "submenu": "soundLab.djMenu",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "6_studio@2"
         }
       ],
       "editor/title": [
@@ -649,6 +836,11 @@
           "command": "soundLab.voiceClone",
           "when": "activeCustomEditorId == soundLab.audioPreview",
           "group": "navigation@4"
+        },
+        {
+          "command": "soundLab.openStudio",
+          "when": "activeCustomEditorId == soundLab.audioPreview",
+          "group": "navigation@5"
         }
       ],
       "commandPalette": [
@@ -662,6 +854,44 @@
           "command": "soundLab.mlxSynthesize",
           "when": "editorHasSelection",
           "group": "9_soundlab@1"
+        }
+      ],
+      "soundLab.djMenu": [
+        {
+          "command": "soundLab.djBackspin",
+          "group": "1_fx@1"
+        },
+        {
+          "command": "soundLab.djEchoOut",
+          "group": "1_fx@2"
+        },
+        {
+          "command": "soundLab.djBeatJump",
+          "group": "1_fx@3"
+        },
+        {
+          "command": "soundLab.djQuickMix",
+          "group": "2_mix@1"
+        },
+        {
+          "command": "soundLab.djLongBlend",
+          "group": "2_mix@2"
+        },
+        {
+          "command": "soundLab.djDoubleDrop",
+          "group": "2_mix@3"
+        },
+        {
+          "command": "soundLab.djMashup",
+          "group": "2_mix@4"
+        },
+        {
+          "command": "soundLab.djAcapella",
+          "group": "3_stems@1"
+        },
+        {
+          "command": "soundLab.djInstrumental",
+          "group": "3_stems@2"
         }
       ]
     },
@@ -970,6 +1200,26 @@
           "type": "number",
           "default": 3000,
           "description": "Port for the mlx-audio Studio dev server."
+        },
+        "soundLab.studio.outputDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Where Sound Lab Studio writes new instrumentals, beats, chords and sound effects. Empty = `sound-lab-studio/` in the first workspace folder (or `~/Sound Lab/Studio`). Relative paths are resolved against the workspace folder. Edits of a track (auto-tune, DJ moves) follow `soundLab.output.*`."
+        },
+        "soundLab.dj.separation": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "mlx",
+            "center"
+          ],
+          "enumDescriptions": [
+            "mlx-audio AI separation when its server is running, otherwise center-channel extraction",
+            "Always use mlx-audio (starts the server)",
+            "Always use the built-in center-channel extractor (stereo files only)"
+          ],
+          "default": "auto",
+          "description": "How DJ: Acapella / Instrumental and Mashup split vocals from music."
         }
       }
     }

@@ -112,7 +112,9 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
       }
       case 'run': {
         const id = String(m.command);
-        if (/^[a-zA-Z]+$/.test(id)) { await vscode.commands.executeCommand(`soundLab.${id}`, uri); }
+        // DJ moves act at the playhead (the editor sends its current time)
+        if (/^dj[A-Z][a-zA-Z]+$/.test(id) && typeof m.at === 'number' && m.at > 0) { await vscode.commands.executeCommand(`soundLab.${id}`, uri, { at: m.at }); }
+        else if (/^[a-zA-Z]+$/.test(id)) { await vscode.commands.executeCommand(`soundLab.${id}`, uri); }
         break;
       }
       case 'analyze': {
@@ -229,6 +231,22 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
     <button data-run="mlxSeparate" title="Split into a sound (e.g. speech) and the rest with mlx-audio">${icon('separate')}Separate…</button>
     <button data-run="voiceClone" title="Record your voice and narrate with it">${icon('voice-clone')}Voice clone</button>
     <button data-run="probe">${icon('info')}Info</button>
+  </div>
+  <div class="actions dj">
+    <span class="dj-label">DJ · at the playhead</span>
+    <button data-run="djBackspin" title="Spin the track backward to a stop at the playhead">${icon('backspin')}Backspin</button>
+    <button data-run="djEchoOut" title="Echo out from the bar at the playhead">${icon('echo-out')}Echo out</button>
+    <button data-run="djBeatJump" title="Jump N beats from the playhead">${icon('beat-jump')}Beat jump…</button>
+    <button data-run="djQuickMix" title="Quick mix into another track">${icon('quick-mix')}Quick mix…</button>
+    <button data-run="djLongBlend" title="Long blend into another track">${icon('long-blend')}Long blend…</button>
+    <button data-run="djDoubleDrop" title="Line up another track's drop with this one">${icon('double-drop')}Double drop…</button>
+    <button data-run="djMashup" title="These vocals over another song's instrumental">${icon('mashup')}Mashup…</button>
+    <button data-run="djAcapella" title="Isolate the vocals">${icon('acapella')}Acapella</button>
+    <button data-run="djInstrumental" title="Remove the vocals">${icon('no-vocals')}Instrumental</button>
+    <span class="spacer"></span>
+    <button data-run="autoTune" title="Pitch-correct this vocal">${icon('autotune')}Auto-tune…</button>
+    <button data-run="detectTempoKey" title="Detect tempo and key">${icon('detect')}Tempo & key</button>
+    <button data-run="openStudio" title="Open Sound Lab Studio">${icon('studio')}Studio</button>
   </div>
 
   <section id="panel-levels" class="panel" hidden>

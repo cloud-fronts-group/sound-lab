@@ -283,3 +283,5 @@ body.playing .scene .row, body.playing .scene .beam { animation-play-state: runn
   .deck-art .arm { transition: none; }
 }
 .mt12 { margin-top: 12px; }
+.actions.dj { padding-top: 8px; border-top: 1px dashed var(--vscode-widget-border, rgba(127, 127, 127, 0.25)); }
+.dj-label { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--vscode-descriptionForeground, #999); margin-right: 4px; }
