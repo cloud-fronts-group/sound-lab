@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { icon, iconSprite } from './icons';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -164,6 +165,7 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
 <title>${esc(title)}</title>
 </head>
 <body>
+  ${iconSprite()}
   <header>
     <h1 id="title">${esc(title)}</h1>
     <div id="chips" class="chips"></div>
@@ -177,9 +179,9 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
   </section>
 
   <div class="transport">
-    <button id="play" class="primary" title="Play / pause (Space)">▶</button>
-    <button id="stop" title="Stop (Home)">■</button>
-    <button id="loop" class="toggle" title="Loop selection (L)">⟲ Loop</button>
+    <button id="play" class="primary" title="Play / pause (Space)" aria-label="Play / pause">${icon('play')}</button>
+    <button id="stop" title="Stop (Home)" aria-label="Stop">${icon('stop')}</button>
+    <button id="loop" class="toggle" title="Loop selection (L)">${icon('loop')}Loop</button>
     <span class="time"><span id="pos">0:00.000</span> / <span id="dur">0:00.000</span></span>
     <span class="sel" id="selInfo">No selection — drag on the waveform</span>
     <span class="spacer"></span>
@@ -187,29 +189,29 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
       <select id="rate"><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select>
     </label>
     <label title="Volume">Vol <input id="vol" type="range" min="0" max="1" step="0.01" value="0.9"></label>
-    <button id="zoomOut" title="Zoom out (-)">−</button>
-    <button id="zoomFit" title="Fit (0)">Fit</button>
-    <button id="zoomIn" title="Zoom in (+)">+</button>
+    <button id="zoomOut" title="Zoom out (-)" aria-label="Zoom out">${icon('zoom-out')}</button>
+    <button id="zoomFit" title="Fit (0)">${icon('zoom-fit')}Fit</button>
+    <button id="zoomIn" title="Zoom in (+)" aria-label="Zoom in">${icon('zoom-in')}</button>
   </div>
 
   <div class="actions">
-    <button id="export" class="primary" disabled title="Save the selection as a new sample (E)">⤓ Export selection</button>
-    <button id="zoomSel" disabled title="Zoom to selection (Z)">Zoom to selection</button>
-    <button data-panel="levels">Levels</button>
-    <button data-panel="spectrogram">Spectrogram</button>
-    <button data-panel="silence">Find silence</button>
-    <button data-panel="transcript">Transcript</button>
+    <button id="export" class="primary" disabled title="Save the selection as a new sample (E)">${icon('export')}Export selection</button>
+    <button id="zoomSel" disabled title="Zoom to selection (Z)">${icon('zoom-selection')}Zoom to selection</button>
+    <button data-panel="levels">${icon('levels')}Levels</button>
+    <button data-panel="spectrogram">${icon('spectrogram')}Spectrogram</button>
+    <button data-panel="silence">${icon('find-silence')}Find silence</button>
+    <button data-panel="transcript">${icon('transcribe')}Transcript</button>
     <span class="spacer"></span>
-    <button data-run="applyEffects">Effects…</button>
-    <button data-run="normalize">Normalize…</button>
-    <button data-run="convert">Convert…</button>
-    <button data-run="sliceEqual">Slice…</button>
-    <button data-run="splitOnSilence">Split on silence…</button>
-    <button data-run="probe">Info</button>
+    <button data-run="applyEffects">${icon('effects')}Effects…</button>
+    <button data-run="normalize">${icon('normalize')}Normalize…</button>
+    <button data-run="convert">${icon('convert')}Convert…</button>
+    <button data-run="sliceEqual">${icon('slice-equal')}Slice…</button>
+    <button data-run="splitOnSilence">${icon('split-silence')}Split on silence…</button>
+    <button data-run="probe">${icon('info')}Info</button>
   </div>
 
   <section id="panel-levels" class="panel" hidden>
-    <h2>Levels <button class="link" id="levelsRefresh">re-measure</button></h2>
+    <h2>Levels <button class="link" id="levelsRefresh">${icon('refresh')}re-measure</button></h2>
     <div id="levelsBody" class="muted">Measuring…</div>
   </section>
 
@@ -226,8 +228,8 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
   <section id="panel-transcript" class="panel" hidden>
     <h2>Transcript
       <input id="tsearch" type="search" placeholder="Filter…">
-      <button class="link" id="tcopy">copy text</button>
-      <button class="link" id="trun">transcribe again</button>
+      <button class="link" id="tcopy">${icon('copy')}copy text</button>
+      <button class="link" id="trun">${icon('transcribe')}transcribe again</button>
     </h2>
     <div id="transcriptBody" class="muted">No transcript yet.</div>
   </section>
