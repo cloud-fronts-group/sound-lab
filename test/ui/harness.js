@@ -72,6 +72,7 @@ const check = (cond, msg) => { console.log(`${cond ? '✔' : '✖'} ${msg}`); if
   for (const [themeName, theme] of Object.entries(THEMES)) {
     const html = baseHtml
       .replace('<head>', `<head>${themeCss(theme)}<script>window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m)});</script>`)
+      .replace('<body>', `<body class="vscode-${themeName}">`) // VS Code tags <body> with vscode-dark / vscode-light
       .replace(/<meta http-equiv="Content-Security-Policy"[^>]+>/, ''); // file:// pages can't satisfy webview CSP
     const pageFile = path.join(work, `page-${themeName}.html`);
     fs.writeFileSync(pageFile, html);
@@ -112,7 +113,25 @@ const check = (cond, msg) => { console.log(`${cond ? '✔' : '✖'} ${msg}`); if
     const exp = (await page.evaluate(() => window.__posted)).find(m => m.type === 'exportSelection');
     check(exp && Math.abs(exp.start - 0.30 * 8) < 0.1 && Math.abs(exp.end - 0.42 * 8) < 0.1, `${tag} exportSelection posts ≈2.40–3.36 s (got ${exp?.start?.toFixed(3)}–${exp?.end?.toFixed(3)})`);
 
+    await page.mouse.move(2, 2); // the harness theme defines no hover colours, so shoot (and measure) the resting state
     await page.screenshot({ path: path.join(OUT, `editor-${themeName}.png`), fullPage: true });
+
+    const exportBg = await page.evaluate(() => getComputedStyle(document.getElementById('export')).backgroundColor);
+    check(exportBg !== 'rgba(0, 0, 0, 0)' && exportBg !== 'transparent', `${tag} primary buttons keep their background (export: ${exportBg})`);
+
+    // DJ booth: pressing play spins deck A, plays the selection on deck B, drops the tonearm and sets the crowd bobbing
+    await page.click('#play');
+    await page.waitForFunction(() => !document.getElementById('audio').paused, null, { timeout: 3000 }).catch(() => undefined);
+    await page.waitForTimeout(500);
+    check(await page.evaluate(() => document.body.classList.contains('playing')), `${tag} body gets .playing while audio plays`);
+    check(await page.locator('#deckA.on').count() === 1, `${tag} deck A spins while playing`);
+    check(await page.locator('#deckB.on').count() === 1, `${tag} deck B spins while playback is inside the selection`);
+    const spinning = await page.evaluate(() => getComputedStyle(document.querySelector('#deckA .spin')).animationPlayState);
+    check(spinning === 'running', `${tag} deck A platter animation is running`);
+    await page.screenshot({ path: path.join(OUT, `editor-${themeName}-playing.png`), fullPage: false });
+    await page.click('#play');
+    await page.waitForTimeout(150);
+    check(await page.locator('#deckA.on').count() === 0, `${tag} deck A stops when paused`);
 
     // Double-click a sound region selects exactly that region
     await page.keyboard.press('Escape');
