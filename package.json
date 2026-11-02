@@ -1,0 +1,662 @@
+{
+  "name": "sound-lab",
+  "displayName": "Sound Lab — FFmpeg Audio Toolkit",
+  "description": "Sound sampling, slicing, loudness, effects, spectrograms and speech-to-text transcription in VS Code, powered by FFmpeg.",
+  "version": "0.1.0",
+  "publisher": "sound-lab",
+  "license": "GPL-3.0-only",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "ffmpeg",
+    "audio",
+    "sampling",
+    "transcription",
+    "whisper",
+    "spectrogram",
+    "waveform",
+    "loudness",
+    "subtitles"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/*.{wav,mp3,flac,ogg,opus,m4a,aac,aif,aiff,wma}"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "soundLab",
+          "title": "Sound Lab",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "soundLab": [
+        {
+          "id": "soundLab.samples",
+          "name": "Samples",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "soundLab.samples",
+        "contents": "No audio files found in this workspace.\n[Record Sample](command:soundLab.record)\n[Generate Tone / Noise](command:soundLab.generateTone)\n[Open Audio File…](command:soundLab.openPreview)"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "soundLab.audioPreview",
+        "displayName": "Sound Lab Audio Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.{wav,mp3,flac,ogg,oga,opus,m4a,aac,aif,aiff,wma,caf,ac3,amr,webm,mka}"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "soundLab.openPreview",
+        "title": "Open in Audio Editor",
+        "category": "Sound Lab",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "soundLab.probe",
+        "title": "Show Media Info (ffprobe)",
+        "category": "Sound Lab",
+        "icon": "$(info)"
+      },
+      {
+        "command": "soundLab.convert",
+        "title": "Convert Format…",
+        "category": "Sound Lab",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "soundLab.batchConvert",
+        "title": "Batch Convert Folder…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.trim",
+        "title": "Trim / Cut Sample…",
+        "category": "Sound Lab",
+        "icon": "$(split-horizontal)"
+      },
+      {
+        "command": "soundLab.normalize",
+        "title": "Normalize Loudness…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.extractAudio",
+        "title": "Extract Audio from Video…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.sliceEqual",
+        "title": "Slice into Equal Chunks…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.splitOnSilence",
+        "title": "Split on Silence…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.applyEffects",
+        "title": "Apply Effects / Filter Chain…",
+        "category": "Sound Lab",
+        "icon": "$(wand)"
+      },
+      {
+        "command": "soundLab.waveformImage",
+        "title": "Render Waveform Image",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.spectrogramImage",
+        "title": "Render Spectrogram Image",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.analyze",
+        "title": "Analyze Loudness & Levels",
+        "category": "Sound Lab",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "soundLab.transcribe",
+        "title": "Transcribe Audio…",
+        "category": "Sound Lab",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "soundLab.setApiKey",
+        "title": "Set Transcription API Key",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.record",
+        "title": "Record Sample from Microphone…",
+        "category": "Sound Lab",
+        "icon": "$(record)"
+      },
+      {
+        "command": "soundLab.generateTone",
+        "title": "Generate Tone / Noise…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.concat",
+        "title": "Concatenate Files…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.muxSubtitles",
+        "title": "Add Subtitles to Video…",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.recipes",
+        "title": "FFmpeg Recipes (open in terminal)…",
+        "category": "Sound Lab",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "soundLab.showCapabilities",
+        "title": "Show FFmpeg Capabilities",
+        "category": "Sound Lab"
+      },
+      {
+        "command": "soundLab.showLog",
+        "title": "Show FFmpeg Log",
+        "category": "Sound Lab",
+        "icon": "$(output)"
+      },
+      {
+        "command": "soundLab.refreshSamples",
+        "title": "Refresh Samples",
+        "category": "Sound Lab",
+        "icon": "$(refresh)"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "soundLab.explorerMenu",
+        "label": "Sound Lab"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "submenu": "soundLab.explorerMenu",
+          "group": "navigation@90",
+          "when": "resourceExtname =~ /^\\.(wav|mp3|flac|ogg|oga|opus|m4a|aac|aif|aiff|wma|caf|ac3|amr|webm|mka|mp4|mov|mkv|avi|m4v|wmv|flv|ts|mts)$/i || explorerResourceIsFolder"
+        }
+      ],
+      "soundLab.explorerMenu": [
+        {
+          "command": "soundLab.openPreview",
+          "group": "1_open@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.probe",
+          "group": "1_open@2",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.analyze",
+          "group": "1_open@3",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.convert",
+          "group": "2_edit@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.trim",
+          "group": "2_edit@2",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.normalize",
+          "group": "2_edit@3",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.applyEffects",
+          "group": "2_edit@4",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.concat",
+          "group": "2_edit@5",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.extractAudio",
+          "group": "2_edit@6",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.sliceEqual",
+          "group": "3_slice@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.splitOnSilence",
+          "group": "3_slice@2",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.waveformImage",
+          "group": "4_render@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.spectrogramImage",
+          "group": "4_render@2",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.transcribe",
+          "group": "5_speech@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.muxSubtitles",
+          "group": "5_speech@2",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.recipes",
+          "group": "6_other@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.batchConvert",
+          "group": "7_folder@1",
+          "when": "explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.record",
+          "group": "7_folder@2",
+          "when": "explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.generateTone",
+          "group": "7_folder@3",
+          "when": "explorerResourceIsFolder"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "soundLab.record",
+          "when": "view == soundLab.samples",
+          "group": "navigation@1"
+        },
+        {
+          "command": "soundLab.recipes",
+          "when": "view == soundLab.samples",
+          "group": "navigation@2"
+        },
+        {
+          "command": "soundLab.refreshSamples",
+          "when": "view == soundLab.samples",
+          "group": "navigation@3"
+        },
+        {
+          "command": "soundLab.generateTone",
+          "when": "view == soundLab.samples",
+          "group": "more@1"
+        },
+        {
+          "command": "soundLab.batchConvert",
+          "when": "view == soundLab.samples",
+          "group": "more@2"
+        },
+        {
+          "command": "soundLab.showCapabilities",
+          "when": "view == soundLab.samples",
+          "group": "more@3"
+        },
+        {
+          "command": "soundLab.setApiKey",
+          "when": "view == soundLab.samples",
+          "group": "more@4"
+        },
+        {
+          "command": "soundLab.showLog",
+          "when": "view == soundLab.samples",
+          "group": "more@5"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "soundLab.openPreview",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "inline@1"
+        },
+        {
+          "command": "soundLab.transcribe",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "inline@2"
+        },
+        {
+          "command": "soundLab.probe",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "1_info@1"
+        },
+        {
+          "command": "soundLab.analyze",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "1_info@2"
+        },
+        {
+          "command": "soundLab.convert",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "soundLab.trim",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "2_edit@2"
+        },
+        {
+          "command": "soundLab.normalize",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "2_edit@3"
+        },
+        {
+          "command": "soundLab.applyEffects",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "2_edit@4"
+        },
+        {
+          "command": "soundLab.sliceEqual",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "3_slice@1"
+        },
+        {
+          "command": "soundLab.splitOnSilence",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "3_slice@2"
+        },
+        {
+          "command": "soundLab.spectrogramImage",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "4_render@1"
+        },
+        {
+          "command": "soundLab.waveformImage",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "4_render@2"
+        },
+        {
+          "command": "soundLab.transcribe",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "5_speech@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "soundLab.transcribe",
+          "when": "activeCustomEditorId == soundLab.audioPreview",
+          "group": "navigation@1"
+        },
+        {
+          "command": "soundLab.applyEffects",
+          "when": "activeCustomEditorId == soundLab.audioPreview",
+          "group": "navigation@2"
+        },
+        {
+          "command": "soundLab.probe",
+          "when": "activeCustomEditorId == soundLab.audioPreview",
+          "group": "navigation@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "soundLab.refreshSamples",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Sound Lab",
+      "properties": {
+        "soundLab.ffmpegPath": {
+          "type": "string",
+          "default": "ffmpeg",
+          "markdownDescription": "Path to the `ffmpeg` executable (or just `ffmpeg` if it is on your PATH)."
+        },
+        "soundLab.ffprobePath": {
+          "type": "string",
+          "default": "ffprobe",
+          "markdownDescription": "Path to the `ffprobe` executable."
+        },
+        "soundLab.output.directory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Where results are written. Empty = next to the source file. Supports `${fileDirname}`, `${workspaceFolder}` and `${fileBasenameNoExtension}`."
+        },
+        "soundLab.output.overwrite": {
+          "type": "boolean",
+          "default": false,
+          "description": "Overwrite existing output files instead of adding a numeric suffix."
+        },
+        "soundLab.defaults.format": {
+          "type": "string",
+          "enum": [
+            "wav",
+            "flac",
+            "aiff",
+            "mp3",
+            "ogg",
+            "opus",
+            "m4a"
+          ],
+          "default": "wav",
+          "description": "Default output format for samples and effects."
+        },
+        "soundLab.defaults.bitDepth": {
+          "type": "number",
+          "enum": [
+            16,
+            24,
+            32
+          ],
+          "default": 24,
+          "description": "Bit depth for WAV / AIFF / FLAC output (32 = float for WAV)."
+        },
+        "soundLab.defaults.sampleRate": {
+          "type": "number",
+          "default": 0,
+          "description": "Output sample rate in Hz. 0 keeps the source rate."
+        },
+        "soundLab.defaults.mp3Bitrate": {
+          "type": "string",
+          "default": "320k",
+          "description": "Bitrate for MP3 / AAC / Opus encoding."
+        },
+        "soundLab.normalize.targetLufs": {
+          "type": "number",
+          "default": -14,
+          "description": "Integrated loudness target for EBU R128 normalization (LUFS). -14 streaming, -16 podcasts, -23 broadcast."
+        },
+        "soundLab.normalize.truePeak": {
+          "type": "number",
+          "default": -1,
+          "description": "Maximum true peak (dBTP)."
+        },
+        "soundLab.normalize.lra": {
+          "type": "number",
+          "default": 11,
+          "description": "Loudness range target (LU)."
+        },
+        "soundLab.silence.thresholdDb": {
+          "type": "number",
+          "default": -40,
+          "description": "Level below which audio counts as silence (dBFS)."
+        },
+        "soundLab.silence.minDuration": {
+          "type": "number",
+          "default": 0.35,
+          "description": "Minimum silence length (seconds) that splits a sample."
+        },
+        "soundLab.silence.padding": {
+          "type": "number",
+          "default": 0.03,
+          "description": "Seconds of silence kept around each split segment."
+        },
+        "soundLab.silence.minSegment": {
+          "type": "number",
+          "default": 0.08,
+          "description": "Discard segments shorter than this (seconds)."
+        },
+        "soundLab.preview.peaksPerSecond": {
+          "type": "number",
+          "default": 200,
+          "description": "Waveform resolution in the audio editor."
+        },
+        "soundLab.explorer.include": {
+          "type": "string",
+          "default": "**/*.{wav,mp3,flac,ogg,oga,opus,m4a,aac,aif,aiff,wma,caf}",
+          "description": "Glob of files listed in the Samples view."
+        },
+        "soundLab.explorer.exclude": {
+          "type": "string",
+          "default": "**/{node_modules,.git,out,dist}/**",
+          "description": "Glob excluded from the Samples view."
+        },
+        "soundLab.record.inputFormat": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "FFmpeg input device format for recording. Empty = auto (`avfoundation` on macOS, `dshow` on Windows, `pulse` on Linux)."
+        },
+        "soundLab.record.device": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Recording device. Empty = pick from a list each time (falls back to `default`)."
+        },
+        "soundLab.transcription.backend": {
+          "type": "string",
+          "enum": [
+            "whisper.cpp",
+            "openai-compatible",
+            "ffmpeg-whisper"
+          ],
+          "enumDescriptions": [
+            "Local whisper.cpp CLI (whisper-cli). Private, offline, needs a ggml model file.",
+            "Any OpenAI-compatible /audio/transcriptions endpoint (OpenAI, Groq, faster-whisper-server, LocalAI…).",
+            "FFmpeg 8+ built-in `whisper` audio filter (requires FFmpeg built with whisper.cpp)."
+          ],
+          "default": "whisper.cpp",
+          "description": "Speech-to-text engine."
+        },
+        "soundLab.transcription.language": {
+          "type": "string",
+          "default": "auto",
+          "description": "Spoken language code (en, de, ja…) or 'auto'."
+        },
+        "soundLab.transcription.translateToEnglish": {
+          "type": "boolean",
+          "default": false,
+          "description": "Translate speech to English instead of transcribing it verbatim."
+        },
+        "soundLab.transcription.prompt": {
+          "type": "string",
+          "default": "",
+          "description": "Optional initial prompt (names, jargon) to guide recognition."
+        },
+        "soundLab.transcription.outputFormats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "srt",
+              "vtt",
+              "txt",
+              "json"
+            ]
+          },
+          "default": [
+            "srt",
+            "vtt",
+            "txt",
+            "json"
+          ],
+          "description": "Transcript files written next to the audio."
+        },
+        "soundLab.transcription.whisperCpp.executable": {
+          "type": "string",
+          "default": "whisper-cli",
+          "description": "whisper.cpp CLI executable (whisper-cli, or main for older builds)."
+        },
+        "soundLab.transcription.whisperCpp.model": {
+          "type": "string",
+          "default": "",
+          "description": "Path to a ggml model, e.g. ggml-base.en.bin."
+        },
+        "soundLab.transcription.whisperCpp.threads": {
+          "type": "number",
+          "default": 0,
+          "description": "Threads for whisper.cpp (0 = its default)."
+        },
+        "soundLab.transcription.whisperCpp.extraArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra CLI arguments for whisper.cpp."
+        },
+        "soundLab.transcription.ffmpegWhisper.model": {
+          "type": "string",
+          "default": "",
+          "description": "ggml model path for FFmpeg's whisper filter."
+        },
+        "soundLab.transcription.openai.baseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "Base URL of an OpenAI-compatible API."
+        },
+        "soundLab.transcription.openai.model": {
+          "type": "string",
+          "default": "whisper-1",
+          "description": "Model name, e.g. whisper-1, whisper-large-v3 (Groq), Systran/faster-whisper-small."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test test/*.test.js",
+    "package": "vsce package --allow-missing-repository",
+    "vscode:prepublish": "npm run compile",
+    "test:ui": "npm run compile && node test/ui/harness.js",
+    "test:all": "npm test && node test/ui/harness.js"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@types/vscode": "1.85.0",
+    "@vscode/vsce": "3.2.1",
+    "typescript": "5.6.3"
+  }
+}
