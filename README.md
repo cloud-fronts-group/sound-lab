@@ -1,5 +1,7 @@
 # Sound Lab — FFmpeg Audio Toolkit for VS Code
 
+[**GitHub repository**](https://github.com/cloud-fronts-group/sound-lab) · [Report an issue](https://github.com/cloud-fronts-group/sound-lab/issues) · [Source & releases](https://github.com/cloud-fronts-group/sound-lab/releases)
+
 Sampling, slicing, loudness, effects, spectrograms and speech-to-text, right inside VS Code. Everything runs on your own **FFmpeg** install, and every operation writes a *new* file, so your originals are never overwritten.
 
 ## Requirements
