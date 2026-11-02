@@ -52,6 +52,12 @@
           "id": "soundLab.samples",
           "name": "Samples",
           "icon": "media/activity.svg"
+        },
+        {
+          "type": "webview",
+          "id": "soundLab.mlxPanel",
+          "name": "MLX Audio",
+          "icon": "media/activity.svg"
         }
       ]
     },
@@ -280,6 +286,87 @@
           "light": "media/icons/refresh-light.svg",
           "dark": "media/icons/refresh-dark.svg"
         }
+      },
+      {
+        "command": "soundLab.voiceClone",
+        "title": "Voice Clone (record your voice, then narrate)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/voice-clone-light.svg",
+          "dark": "media/icons/voice-clone-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStart",
+        "title": "Start mlx-audio Server",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-light.svg",
+          "dark": "media/icons/server-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStop",
+        "title": "Stop mlx-audio Server",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-stop-light.svg",
+          "dark": "media/icons/server-stop-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStatus",
+        "title": "mlx-audio Server Status & Actions",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-light.svg",
+          "dark": "media/icons/server-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxModels",
+        "title": "mlx-audio Models (load / unload)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/model-light.svg",
+          "dark": "media/icons/model-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxSynthesize",
+        "title": "Text to Speech (mlx-audio)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/speak-light.svg",
+          "dark": "media/icons/speak-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxSeparate",
+        "title": "Separate Sources (mlx-audio)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/separate-light.svg",
+          "dark": "media/icons/separate-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxOpenStudio",
+        "title": "Open mlx-audio Studio",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/studio-light.svg",
+          "dark": "media/icons/studio-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStopStudio",
+        "title": "Stop mlx-audio Studio",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-stop-light.svg",
+          "dark": "media/icons/server-stop-dark.svg"
+        }
       }
     ],
     "submenus": [
@@ -391,6 +478,11 @@
           "command": "soundLab.generateTone",
           "group": "7_folder@3",
           "when": "explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.mlxSeparate",
+          "group": "5_speech@3",
+          "when": "!explorerResourceIsFolder"
         }
       ],
       "view/title": [
@@ -433,6 +525,36 @@
           "command": "soundLab.showLog",
           "when": "view == soundLab.samples",
           "group": "more@5"
+        },
+        {
+          "command": "soundLab.voiceClone",
+          "when": "view == soundLab.mlxPanel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "soundLab.mlxOpenStudio",
+          "when": "view == soundLab.mlxPanel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "soundLab.mlxModels",
+          "when": "view == soundLab.mlxPanel",
+          "group": "navigation@3"
+        },
+        {
+          "command": "soundLab.mlxStart",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@1"
+        },
+        {
+          "command": "soundLab.mlxStop",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@2"
+        },
+        {
+          "command": "soundLab.mlxStopStudio",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@3"
         }
       ],
       "view/item/context": [
@@ -500,6 +622,11 @@
           "command": "soundLab.transcribe",
           "when": "view == soundLab.samples && viewItem == soundLab.file",
           "group": "5_speech@1"
+        },
+        {
+          "command": "soundLab.mlxSeparate",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "5_speech@2"
         }
       ],
       "editor/title": [
@@ -517,12 +644,24 @@
           "command": "soundLab.probe",
           "when": "activeCustomEditorId == soundLab.audioPreview",
           "group": "navigation@3"
+        },
+        {
+          "command": "soundLab.voiceClone",
+          "when": "activeCustomEditorId == soundLab.audioPreview",
+          "group": "navigation@4"
         }
       ],
       "commandPalette": [
         {
           "command": "soundLab.refreshSamples",
           "when": "false"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "soundLab.mlxSynthesize",
+          "when": "editorHasSelection",
+          "group": "9_soundlab@1"
         }
       ]
     },
@@ -648,12 +787,14 @@
           "enum": [
             "whisper.cpp",
             "openai-compatible",
-            "ffmpeg-whisper"
+            "ffmpeg-whisper",
+            "mlx-audio"
           ],
           "enumDescriptions": [
             "Local whisper.cpp CLI (whisper-cli). Private, offline, needs a ggml model file.",
             "Any OpenAI-compatible /audio/transcriptions endpoint (OpenAI, Groq, faster-whisper-server, LocalAI…).",
-            "FFmpeg 8+ built-in `whisper` audio filter (requires FFmpeg built with whisper.cpp)."
+            "FFmpeg 8+ built-in `whisper` audio filter (requires FFmpeg built with whisper.cpp).",
+            "mlx-audio server (Sound Lab manages it): MLX Whisper / Parakeet on the Apple GPU natively, or in a Docker/Podman/Apple container (mlx[cuda12] on NVIDIA, mlx[cpu] otherwise)."
           ],
           "default": "whisper.cpp",
           "description": "Speech-to-text engine."
@@ -729,6 +870,106 @@
           "type": "string",
           "default": "whisper-1",
           "description": "Model name, e.g. whisper-1, whisper-large-v3 (Groq), Systran/faster-whisper-small."
+        },
+        "soundLab.mlx.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "native",
+            "docker",
+            "podman",
+            "apple-container",
+            "external"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "native on Apple Silicon, docker elsewhere",
+            "Host Python `mlx_audio.server` — MLX on the Apple GPU (Metal)",
+            "Docker image (:cuda12 = mlx[cuda12] on NVIDIA, :cpu otherwise)",
+            "Podman image (same tags; CDI for NVIDIA)",
+            "Apple `container` CLI (macOS 26) — CPU",
+            "An mlx-audio server you run yourself at soundLab.mlx.url"
+          ],
+          "markdownDescription": "How Sound Lab runs the **mlx-audio** API server (STT, TTS, voice cloning, separation). Containers on macOS have no Metal access, so the Apple-GPU path is `native`."
+        },
+        "soundLab.mlx.url": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Base URL of an mlx-audio server (mode `external`, or to override). Empty = `http://127.0.0.1:<port>`."
+        },
+        "soundLab.mlx.port": {
+          "type": "number",
+          "default": 8000,
+          "description": "Port of the mlx-audio API server."
+        },
+        "soundLab.mlx.python": {
+          "type": "string",
+          "default": "python3",
+          "markdownDescription": "Python with `mlx-audio[server]` installed (native mode), e.g. a venv's `bin/python`."
+        },
+        "soundLab.mlx.image": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Container image for docker/podman/apple-container. Empty = `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu` or `:cuda12` (see `soundLab.mlx.gpu`)."
+        },
+        "soundLab.mlx.gpu": {
+          "type": "string",
+          "enum": [
+            "none",
+            "nvidia"
+          ],
+          "default": "none",
+          "markdownDescription": "`nvidia` uses the `:cuda12` image (pip `mlx[cuda12]`) with GPU passthrough. Needs an NVIDIA GPU, driver ≥ 550 and the NVIDIA Container Toolkit."
+        },
+        "soundLab.mlx.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the mlx-audio server automatically when a feature needs it."
+        },
+        "soundLab.mlx.stopOnExit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Stop a natively started mlx-audio server when VS Code closes."
+        },
+        "soundLab.mlx.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the mlx-audio server status in the status bar."
+        },
+        "soundLab.mlx.sttModel": {
+          "type": "string",
+          "default": "mlx-community/whisper-large-v3-turbo",
+          "description": "Speech-to-text model for the mlx-audio backend."
+        },
+        "soundLab.mlx.ttsModel": {
+          "type": "string",
+          "default": "mlx-community/Kokoro-82M-bf16",
+          "description": "Default text-to-speech model."
+        },
+        "soundLab.mlx.ttsVoice": {
+          "type": "string",
+          "default": "af_heart",
+          "description": "Default voice for the text-to-speech model (Kokoro: af_heart, am_adam, bf_emma, bm_george…)."
+        },
+        "soundLab.mlx.cloneModel": {
+          "type": "string",
+          "default": "mlx-community/chatterbox-turbo-4bit",
+          "description": "Default voice-cloning model (must accept a reference recording: Chatterbox, Qwen3-TTS Base, CSM, Spark, OuteTTS…)."
+        },
+        "soundLab.mlx.separationModel": {
+          "type": "string",
+          "default": "",
+          "description": "Source-separation model id (empty = server default, mlx-community/sam-audio-large-fp16)."
+        },
+        "soundLab.mlx.studio.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Folder of mlx-audio Studio (`mlx_audio/ui`). Empty = find it in an editable mlx-audio install or download it on first use."
+        },
+        "soundLab.mlx.studio.port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the mlx-audio Studio dev server."
         }
       }
     }
@@ -737,9 +978,9 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node --test test/*.test.js",
-    "package": "vsce package --allow-missing-repository",
+    "package": "vsce package",
     "vscode:prepublish": "npm run compile",
-    "test:ui": "npm run compile && node test/ui/harness.js",
+    "test:ui": "npm run compile && node test/ui/harness.js && node test/ui/mlx-harness.js",
     "test:all": "npm test && node test/ui/harness.js"
   },
   "devDependencies": {
@@ -747,5 +988,13 @@
     "@types/vscode": "1.85.0",
     "@vscode/vsce": "3.2.1",
     "typescript": "5.6.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloud-fronts-group/sound-lab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cloud-fronts-group/sound-lab/issues"
+  },
+  "homepage": "https://github.com/cloud-fronts-group/sound-lab#readme"
 }

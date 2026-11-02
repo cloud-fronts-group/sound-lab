@@ -282,3 +282,4 @@ body.playing .scene .row, body.playing .scene .beam { animation-play-state: runn
   .scene .row, .scene .beam, .scene .lamp, .deck-art .spin { animation: none; }
   .deck-art .arm { transition: none; }
 }
+.mt12 { margin-top: 12px; }

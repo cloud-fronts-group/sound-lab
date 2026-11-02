@@ -5,8 +5,9 @@ import { run, runOk } from './ffmpeg';
 import { toWhisperWav, toUploadChunks } from './recipes';
 import { probe, summarize } from './probe';
 import { Segment, fromWhisperCppJson, fromOpenAiJson, parseCues } from './subtitles';
+import { MlxAudioClient } from './mlxAudio';
 
-export type Backend = 'whisper.cpp' | 'openai-compatible' | 'ffmpeg-whisper';
+export type Backend = 'whisper.cpp' | 'openai-compatible' | 'ffmpeg-whisper' | 'mlx-audio';
 
 export interface TranscribeConfig {
   backend: Backend;
@@ -19,6 +20,8 @@ export interface TranscribeConfig {
   whisperCpp: { exe: string; model: string; threads: number; extraArgs: string[] };
   ffmpegWhisperModel: string;
   openai: { baseUrl: string; model: string; apiKey?: string };
+  /** mlx-audio server (backend 'mlx-audio'). ensure() starts it if needed and returns the client. */
+  mlx?: { model: string; ensure: (signal?: AbortSignal) => Promise<MlxAudioClient> };
 }
 
 export interface TranscribeHooks {
@@ -35,6 +38,7 @@ export async function transcribe(input: string, duration: number, cfg: Transcrib
       case 'whisper.cpp': return await viaWhisperCpp(input, duration, cfg, hooks, work);
       case 'openai-compatible': return await viaOpenAi(input, duration, cfg, hooks, work);
       case 'ffmpeg-whisper': return await viaFfmpegFilter(input, duration, cfg, hooks, work);
+      case 'mlx-audio': return await viaMlxAudio(input, duration, cfg, hooks, work);
       default: throw new Error(`Unknown transcription backend: ${cfg.backend}`);
     }
   } finally {
@@ -146,4 +150,18 @@ async function viaFfmpegFilter(input: string, duration: number, cfg: TranscribeC
     onLog: h.onLog, signal: h.signal,
   });
   return parseCues(fs.readFileSync(out, 'utf8'));
+}
+
+async function viaMlxAudio(input: string, duration: number, cfg: TranscribeConfig, h: TranscribeHooks, work: string): Promise<Segment[]> {
+  if (!cfg.mlx) { throw new Error('mlx-audio backend is not configured.'); }
+  const wav = path.join(work, 'input.wav');
+  h.onProgress?.(0, 'Preparing 16 kHz audio…');
+  await runOk({ exe: cfg.ffmpeg, args: toWhisperWav(input, wav), durationSec: duration, onProgress: f => h.onProgress?.(f * 0.1, 'Preparing 16 kHz audio…'), onLog: h.onLog, signal: h.signal });
+  h.onProgress?.(0.1, 'Connecting to mlx-audio server…');
+  const client = await cfg.mlx.ensure(h.signal);
+  h.onProgress?.(0.15, `Transcribing with ${cfg.mlx.model} on ${client.url}…`);
+  const t = await client.transcribe(wav, { model: cfg.mlx.model, language: cfg.language, prompt: cfg.prompt, signal: h.signal });
+  h.onProgress?.(1, 'Done');
+  if (t.segments.length) { return t.segments; }
+  return t.text ? [{ start: 0, end: duration, text: t.text }] : [];
 }

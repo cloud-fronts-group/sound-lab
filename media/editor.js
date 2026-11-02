@@ -328,7 +328,7 @@
   function renderLevels(r) {
     if (!r) { $('levelsBody').textContent = 'Measurement cancelled or failed.'; return; }
     const f = (v, u) => (v === null || v === undefined || Number.isNaN(v) ? '—' : !isFinite(v) ? '−∞' : v.toFixed(1)) + (u ? ` ${u}` : '');
-    const meter = (v, lo, hi) => `<div class="meter"><div style="width:${clamp(((v - lo) / (hi - lo)) * 100, 0, 100)}%"></div></div>`;
+    const meter = (v, lo, hi) => `<div class="meter"><div data-w="${clamp(((v - lo) / (hi - lo)) * 100, 0, 100).toFixed(1)}"></div></div>`;
     const stats = Object.entries(r.stats || {}).filter(([k]) => /Peak level|RMS level|Crest|Dynamic range|DC offset|Noise floor|Zero crossings rate|Flat factor/.test(k));
     $('levelsBody').classList.remove('muted');
     $('levelsBody').innerHTML = `
@@ -337,12 +337,14 @@
         <div><div class="muted">True peak</div><div class="big">${f(r.truePeakDbtp, 'dBTP')}</div>${meter(r.truePeakDbtp, -30, 3)}</div>
         <div><div class="muted">Loudness range</div><div class="big">${f(r.lra, 'LU')}</div>${meter(r.lra, 0, 25)}</div>
       </div>
-      <table style="margin-top:12px">
+      <table class="mt12">
         <tr><th>Mean volume</th><td>${f(r.meanVolumeDb, 'dB')}</td><th>Max volume</th><td>${f(r.maxVolumeDb, 'dB')}</td></tr>
         ${stats.map(([k, v]) => `<tr><th>${esc(k)}</th><td colspan="3">${esc(String(v))}</td></tr>`).join('')}
         <tr><th>To −14 LUFS</th><td>${isFinite(r.integratedLufs) ? ((-14 - r.integratedLufs >= 0 ? '+' : '') + (-14 - r.integratedLufs).toFixed(1) + ' dB') : '—'}</td>
             <th>To −23 LUFS</th><td>${isFinite(r.integratedLufs) ? ((-23 - r.integratedLufs >= 0 ? '+' : '') + (-23 - r.integratedLufs).toFixed(1) + ' dB') : '—'}</td></tr>
       </table>`;
+    // CSP forbids inline style attributes; set meter widths through the CSSOM instead.
+    $('levelsBody').querySelectorAll('[data-w]').forEach((/** @type {HTMLElement} */ el) => { el.style.width = `${el.dataset.w}%`; });
   }
 
   function renderRegions() {

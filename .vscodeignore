@@ -9,3 +9,6 @@ node_modules/**
 CLAUDE.md
 .gitignore
 media/icons/library/**
+plugins/**
+.claude-plugin/**
+.github/**
