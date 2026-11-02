@@ -8,3 +8,4 @@ node_modules/**
 .claude/**
 CLAUDE.md
 .gitignore
+media/icons/library/**
