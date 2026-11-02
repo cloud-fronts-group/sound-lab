@@ -9,6 +9,7 @@
   const canvas = /** @type {HTMLCanvasElement} */ ($('wave'));
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
   const audio = /** @type {HTMLAudioElement} */ ($('audio'));
+  const deck = { a: $('deckA'), b: $('deckB') };
 
   const S = {
     info: /** @type {any} */ (null),
@@ -172,6 +173,7 @@
     $('selInfo').textContent = S.sel
       ? `Selection ${fmt(S.sel.start)} → ${fmt(S.sel.end)}  (${fmt(S.sel.end - S.sel.start)})`
       : 'No selection — drag on the waveform';
+    syncDecks();
     requestDraw();
   }
 
@@ -239,6 +241,15 @@
   function stop() { audio.pause(); seek(S.sel ? S.sel.start : 0); }
   function playRange(a, b) { setSel({ start: a, end: b }); audio.currentTime = a; audio.play().catch(() => undefined); }
 
+  // Deck A spins while the track plays; deck B (the selection) spins while playback is inside it, or always when looping it.
+  function syncDecks() {
+    const playing = !audio.paused;
+    const t = audio.currentTime || 0;
+    document.body.classList.toggle('playing', playing);
+    deck.a.classList.toggle('on', playing);
+    deck.b.classList.toggle('on', playing && !!S.sel && (S.loop || (t >= S.sel.start && t <= S.sel.end)));
+  }
+
   function tick(force = false) {
     const t = audio.currentTime || 0;
     if (S.sel && !audio.paused) {
@@ -253,18 +264,19 @@
       const span = S.view.end - S.view.start; setView(t - span * 0.05, t + span * 0.95);
     }
     highlightSegment(t);
+    syncDecks();
     if (force || !audio.paused) { requestDraw(); }
   }
   (function loop() { if (!audio.paused) { tick(); } requestAnimationFrame(loop); })();
-  audio.addEventListener('play', () => { $('play').innerHTML = ic('pause'); });
+  audio.addEventListener('play', () => { $('play').innerHTML = ic('pause'); syncDecks(); });
   audio.addEventListener('pause', () => { $('play').innerHTML = ic('play'); tick(true); });
-  audio.addEventListener('ended', () => { if (S.loop) { seek(S.sel ? S.sel.start : 0); audio.play(); } });
+  audio.addEventListener('ended', () => { syncDecks(); if (S.loop) { seek(S.sel ? S.sel.start : 0); audio.play(); } });
   audio.addEventListener('loadedmetadata', () => { if (!S.duration && isFinite(audio.duration)) { S.duration = audio.duration; $('dur').textContent = fmt(S.duration); fit(); } });
   audio.addEventListener('error', () => showError('This audio could not be played in the editor preview (analysis tools still work).'));
 
   $('play').onclick = togglePlay;
   $('stop').onclick = stop;
-  $('loop').onclick = () => { S.loop = !S.loop; $('loop').classList.toggle('on', S.loop); };
+  $('loop').onclick = () => { S.loop = !S.loop; $('loop').classList.toggle('on', S.loop); syncDecks(); };
   $('rate').onchange = () => { audio.playbackRate = Number($('rate').value); };
   $('vol').oninput = () => { audio.volume = Number($('vol').value); };
   audio.volume = 0.9;
