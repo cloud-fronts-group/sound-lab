@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { icon, iconSprite } from './icons';
+import { deckSvg, stageSvg } from './stage';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -175,26 +176,44 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
 
   <div id="error" class="error" hidden></div>
 
-  <section class="wave-wrap">
+  <section class="stage">${stageSvg()}</section>
+
+  <section class="wave-wrap screen">
     <canvas id="wave" tabindex="0" aria-label="Waveform. Drag to select, click to seek, scroll to zoom."></canvas>
     <div id="loading" class="loading">Decoding waveform…</div>
   </section>
 
-  <div class="transport">
-    <button id="play" class="primary" title="Play / pause (Space)" aria-label="Play / pause">${icon('play')}</button>
-    <button id="stop" title="Stop (Home)" aria-label="Stop">${icon('stop')}</button>
-    <button id="loop" class="toggle" title="Loop selection (L)">${icon('loop')}Loop</button>
-    <span class="time"><span id="pos">0:00.000</span> / <span id="dur">0:00.000</span></span>
-    <span class="sel" id="selInfo">No selection — drag on the waveform</span>
-    <span class="spacer"></span>
-    <label title="Playback rate">Rate
-      <select id="rate"><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select>
-    </label>
-    <label title="Volume">Vol <input id="vol" type="range" min="0" max="1" step="0.01" value="0.9"></label>
-    <button id="zoomOut" title="Zoom out (-)" aria-label="Zoom out">${icon('zoom-out')}</button>
-    <button id="zoomFit" title="Fit (0)">${icon('zoom-fit')}Fit</button>
-    <button id="zoomIn" title="Zoom in (+)" aria-label="Zoom in">${icon('zoom-in')}</button>
-  </div>
+  <section class="booth">
+    <div class="deck deck-a" id="deckA">
+      ${deckSvg('A')}
+      <div class="deck-cap"><b>Deck A</b><span>Full track</span></div>
+    </div>
+
+    <div class="mixer">
+      <div class="lcd" aria-label="Playback position"><span id="pos">0:00.000</span><span class="of">/ <span id="dur">0:00.000</span></span></div>
+      <div class="transport">
+        <button id="play" class="primary" title="Play / pause (Space)" aria-label="Play / pause">${icon('play')}</button>
+        <button id="stop" title="Stop (Home)" aria-label="Stop">${icon('stop')}</button>
+        <button id="loop" class="toggle" title="Loop selection (L)">${icon('loop')}Loop</button>
+      </div>
+      <div class="faders">
+        <label class="fader" title="Volume"><span>Vol</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.9"></label>
+        <label class="pitch" title="Playback rate (pitch fader)"><span>Pitch ×</span>
+          <select id="rate"><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select>
+        </label>
+      </div>
+      <div class="zoomrow">
+        <button id="zoomOut" title="Zoom out (-)" aria-label="Zoom out">${icon('zoom-out')}</button>
+        <button id="zoomFit" title="Fit (0)">${icon('zoom-fit')}Fit</button>
+        <button id="zoomIn" title="Zoom in (+)" aria-label="Zoom in">${icon('zoom-in')}</button>
+      </div>
+    </div>
+
+    <div class="deck deck-b" id="deckB">
+      ${deckSvg('B')}
+      <div class="deck-cap"><b>Deck B</b><span class="sel" id="selInfo">No selection — drag on the waveform</span></div>
+    </div>
+  </section>
 
   <div class="actions">
     <button id="export" class="primary" disabled title="Save the selection as a new sample (E)">${icon('export')}Export selection</button>
