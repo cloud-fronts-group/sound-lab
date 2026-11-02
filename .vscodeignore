@@ -12,3 +12,4 @@ media/icons/library/**
 plugins/**
 .claude-plugin/**
 .github/**
+scripts/**
