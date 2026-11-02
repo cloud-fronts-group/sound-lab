@@ -70,127 +70,208 @@
         "command": "soundLab.openPreview",
         "title": "Open in Audio Editor",
         "category": "Sound Lab",
-        "icon": "$(play-circle)"
+        "icon": {
+          "light": "media/icons/open-editor-light.svg",
+          "dark": "media/icons/open-editor-dark.svg"
+        }
       },
       {
         "command": "soundLab.probe",
         "title": "Show Media Info (ffprobe)",
         "category": "Sound Lab",
-        "icon": "$(info)"
+        "icon": {
+          "light": "media/icons/info-light.svg",
+          "dark": "media/icons/info-dark.svg"
+        }
       },
       {
         "command": "soundLab.convert",
         "title": "Convert Format…",
         "category": "Sound Lab",
-        "icon": "$(arrow-swap)"
+        "icon": {
+          "light": "media/icons/convert-light.svg",
+          "dark": "media/icons/convert-dark.svg"
+        }
       },
       {
         "command": "soundLab.batchConvert",
         "title": "Batch Convert Folder…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/batch-convert-light.svg",
+          "dark": "media/icons/batch-convert-dark.svg"
+        }
       },
       {
         "command": "soundLab.trim",
         "title": "Trim / Cut Sample…",
         "category": "Sound Lab",
-        "icon": "$(split-horizontal)"
+        "icon": {
+          "light": "media/icons/trim-light.svg",
+          "dark": "media/icons/trim-dark.svg"
+        }
       },
       {
         "command": "soundLab.normalize",
         "title": "Normalize Loudness…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/normalize-light.svg",
+          "dark": "media/icons/normalize-dark.svg"
+        }
       },
       {
         "command": "soundLab.extractAudio",
         "title": "Extract Audio from Video…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/extract-audio-light.svg",
+          "dark": "media/icons/extract-audio-dark.svg"
+        }
       },
       {
         "command": "soundLab.sliceEqual",
         "title": "Slice into Equal Chunks…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/slice-equal-light.svg",
+          "dark": "media/icons/slice-equal-dark.svg"
+        }
       },
       {
         "command": "soundLab.splitOnSilence",
         "title": "Split on Silence…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/split-silence-light.svg",
+          "dark": "media/icons/split-silence-dark.svg"
+        }
       },
       {
         "command": "soundLab.applyEffects",
         "title": "Apply Effects / Filter Chain…",
         "category": "Sound Lab",
-        "icon": "$(wand)"
+        "icon": {
+          "light": "media/icons/effects-light.svg",
+          "dark": "media/icons/effects-dark.svg"
+        }
       },
       {
         "command": "soundLab.waveformImage",
         "title": "Render Waveform Image",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/waveform-image-light.svg",
+          "dark": "media/icons/waveform-image-dark.svg"
+        }
       },
       {
         "command": "soundLab.spectrogramImage",
         "title": "Render Spectrogram Image",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/spectrogram-light.svg",
+          "dark": "media/icons/spectrogram-dark.svg"
+        }
       },
       {
         "command": "soundLab.analyze",
         "title": "Analyze Loudness & Levels",
         "category": "Sound Lab",
-        "icon": "$(graph)"
+        "icon": {
+          "light": "media/icons/levels-light.svg",
+          "dark": "media/icons/levels-dark.svg"
+        }
       },
       {
         "command": "soundLab.transcribe",
         "title": "Transcribe Audio…",
         "category": "Sound Lab",
-        "icon": "$(comment-discussion)"
+        "icon": {
+          "light": "media/icons/transcribe-light.svg",
+          "dark": "media/icons/transcribe-dark.svg"
+        }
       },
       {
         "command": "soundLab.setApiKey",
         "title": "Set Transcription API Key",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/key-light.svg",
+          "dark": "media/icons/key-dark.svg"
+        }
       },
       {
         "command": "soundLab.record",
         "title": "Record Sample from Microphone…",
         "category": "Sound Lab",
-        "icon": "$(record)"
+        "icon": {
+          "light": "media/icons/record-light.svg",
+          "dark": "media/icons/record-dark.svg"
+        }
       },
       {
         "command": "soundLab.generateTone",
         "title": "Generate Tone / Noise…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/tone-light.svg",
+          "dark": "media/icons/tone-dark.svg"
+        }
       },
       {
         "command": "soundLab.concat",
         "title": "Concatenate Files…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/combine-light.svg",
+          "dark": "media/icons/combine-dark.svg"
+        }
       },
       {
         "command": "soundLab.muxSubtitles",
         "title": "Add Subtitles to Video…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/subtitles-light.svg",
+          "dark": "media/icons/subtitles-dark.svg"
+        }
       },
       {
         "command": "soundLab.recipes",
         "title": "FFmpeg Recipes (open in terminal)…",
         "category": "Sound Lab",
-        "icon": "$(terminal)"
+        "icon": {
+          "light": "media/icons/terminal-light.svg",
+          "dark": "media/icons/terminal-dark.svg"
+        }
       },
       {
         "command": "soundLab.showCapabilities",
         "title": "Show FFmpeg Capabilities",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/capabilities-light.svg",
+          "dark": "media/icons/capabilities-dark.svg"
+        }
       },
       {
         "command": "soundLab.showLog",
         "title": "Show FFmpeg Log",
         "category": "Sound Lab",
-        "icon": "$(output)"
+        "icon": {
+          "light": "media/icons/log-light.svg",
+          "dark": "media/icons/log-dark.svg"
+        }
       },
       {
         "command": "soundLab.refreshSamples",
         "title": "Refresh Samples",
         "category": "Sound Lab",
-        "icon": "$(refresh)"
+        "icon": {
+          "light": "media/icons/refresh-light.svg",
+          "dark": "media/icons/refresh-dark.svg"
+        }
       }
     ],
     "submenus": [
