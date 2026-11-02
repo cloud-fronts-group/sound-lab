@@ -484,10 +484,14 @@ export async function cmdSetApiKey(): Promise<void> {
   vscode.window.showInformationMessage(key ? 'Transcription API key saved.' : 'Transcription API key removed.');
 }
 
-async function transcribeConfig(): Promise<TranscribeConfig | undefined> {
+/** Set by extension.ts: lets the 'mlx-audio' backend start/reach the managed mlx-audio server. */
+let mlxHook: TranscribeConfig['mlx'] | undefined;
+export function setMlxTranscription(h: TranscribeConfig['mlx']): void { mlxHook = h; }
+
+async function transcribeConfig(override?: Backend): Promise<TranscribeConfig | undefined> {
   const c = cfg();
   const t = tools();
-  const backend = (c.get<string>('transcription.backend') ?? 'whisper.cpp') as Backend;
+  const backend = override ?? (c.get<string>('transcription.backend') ?? 'whisper.cpp') as Backend;
   const conf: TranscribeConfig = {
     backend, ffmpeg: t.ffmpeg, ffprobe: t.ffprobe,
     language: c.get<string>('transcription.language') || 'auto',
@@ -507,6 +511,8 @@ async function transcribeConfig(): Promise<TranscribeConfig | undefined> {
       apiKey: (await state.context.secrets.get(SECRET_KEY)) || process.env.OPENAI_API_KEY,
     },
   };
+  conf.mlx = mlxHook;
+  if (backend === 'mlx-audio' && !mlxHook) { vscode.window.showErrorMessage('mlx-audio backend is not available.'); return undefined; }
   // First-run help: point at a model / key instead of failing deep inside the job.
   if (backend === 'whisper.cpp' && !conf.whisperCpp.model) {
     const pick = await vscode.window.showWarningMessage('whisper.cpp needs a ggml model file (e.g. ggml-base.en.bin).', 'Choose Model File…', 'Download Models', 'Use API Instead');
@@ -557,9 +563,10 @@ export function loadTranscript(src: string): Segment[] | undefined {
 }
 
 export async function cmdTranscribe(arg?: unknown, args?: unknown): Promise<Segment[] | undefined> {
+  const override = [arg, args].find(a => a && typeof a === 'object' && !Array.isArray(a) && 'backend' in (a as object)) as { backend?: Backend } | undefined;
   const [uri] = await resolveTargets(arg, args);
   if (!uri) { return; }
-  const conf = await transcribeConfig();
+  const conf = await transcribeConfig(override?.backend);
   if (!conf) { return; }
   const src = uri.fsPath;
   const formats = cfg().get<string[]>('transcription.outputFormats') ?? ['srt', 'txt'];

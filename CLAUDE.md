@@ -34,6 +34,12 @@ src/
   commands.ts      one exported `cmdXxx(arg, args)` per command (UI prompts → recipes → ff())
   audioEditor.ts   CustomReadonlyEditorProvider `soundLab.audioPreview` + webview HTML/CSP + message handling
   sampleExplorer.ts Tree view `soundLab.samples`
+  mlx.ts           MlxController: settings → MlxAudioClient/StudioManager, status bar, MLX commands
+  mlxPanel.ts      Sidebar webview view `soundLab.mlxPanel` (TTS, STT, separation, voices)
+  studioPanel.ts   mlx-audio Studio embedded (iframe) in an editor tab
+  voiceCloneWizard.ts  Voice Clone wizard webview (record → build → create)
+  core/mlxAudio.ts     mlx-audio HTTP client + server/Studio lifecycle (no vscode)
+  core/voiceClone.ts   prompts, take checks, reference, profiles, audiobook/presentation/vocals renderers (no vscode)
   extension.ts     activate(): registers the command map, views, editor, status bar
 media/editor.js    webview script (plain JS, // @ts-check). It talks to audioEditor.ts via postMessage.
 media/editor.css   webview styles. Use VS Code theme variables only, so it works in light and dark themes.
@@ -74,10 +80,16 @@ test/ui/harness.js      Playwright webview check
 - `alimiter level=` is a boolean: use `0`/`1`, not `disabled`.
 - The ffmpeg 6.x on the dev box has **no `whisper` filter**. That backend is only covered by its "missing filter" error-path test.
 
+- mlx-audio reads `ref_audio` as a **path on the server's filesystem** (no upload). Voice references live in `globalStorage/voices` and are mounted read-only at `/soundlab/voices` for container modes (`MlxAudioClient.serverPath`).
+- mlx-audio Studio (`mlx_audio/ui`, Next.js) is **not in the pip wheel**. `StudioManager` locates or downloads it and runs `next dev` with `NEXT_PUBLIC_API_BASE_URL`/`NEXT_PUBLIC_API_PORT` pointing at the managed server. Embed it via `asExternalUri` and add the origin to `frame-src`.
+- Webview CSP forbids inline `style="…"` attributes, including in `innerHTML` templates. Use classes, or set `element.style` from script. The UI harnesses run under the real CSP, so violations fail the run.
+- MP4 drops the `title` stream tag. Write `handler_name` too.
+- A lavfi "microphone" renders faster than real time. Add `arealtime` when it stands in for live recording.
+
 ## Verifying changes
 
 1. `npm test`. All suites must pass. Add a test in `test/core.test.js` for any new recipe or effect, and assert durations, codecs or levels with ffprobe.
-2. If you touched `media/` or `audioEditor.ts`: run `npm run test:ui` and look at `test/ui/out/editor.png`.
+2. If you touched `media/` or any webview: run `npm run test:ui` (editor harness plus the end-to-end mlx-audio harness; set `MLX_STUDIO_DIR` to an installed `mlx_audio/ui` to include the embedded Studio) and look at `test/ui/out/*.png`.
 3. `npm run package` must succeed before you report a change as done.
 
 ## Claude Code plugin (plugins/sound-lab-studio)
