@@ -1024,7 +1024,7 @@
             "Local whisper.cpp CLI (whisper-cli). Private, offline, needs a ggml model file.",
             "Any OpenAI-compatible /audio/transcriptions endpoint (OpenAI, Groq, faster-whisper-server, LocalAI…).",
             "FFmpeg 8+ built-in `whisper` audio filter (requires FFmpeg built with whisper.cpp).",
-            "mlx-audio server (Sound Lab manages it): MLX Whisper / Parakeet on the Apple GPU natively, or on the CPU in a Docker/Podman/Apple container (mlx[cpu])."
+            "mlx-audio server (Sound Lab manages it): MLX Whisper / Parakeet on the Apple GPU natively, or in a Docker/Podman/Apple container (mlx[cuda12] on NVIDIA, mlx[cpu] otherwise)."
           ],
           "default": "whisper.cpp",
           "description": "Speech-to-text engine."
@@ -1115,8 +1115,8 @@
           "enumDescriptions": [
             "native on Apple Silicon, docker elsewhere",
             "Host Python `mlx_audio.server` — MLX on the Apple GPU (Metal)",
-            "Docker image (mlx[cpu]) — CPU",
-            "Podman image (mlx[cpu]) — CPU",
+            "Docker image (:cuda12 = mlx[cuda12] on NVIDIA, :cpu otherwise)",
+            "Podman image (same tags; CDI for NVIDIA)",
             "Apple `container` CLI (macOS 26) — CPU",
             "An mlx-audio server you run yourself at soundLab.mlx.url"
           ],
@@ -1140,7 +1140,16 @@
         "soundLab.mlx.image": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Container image for docker/podman/apple-container. Empty = `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu`."
+          "markdownDescription": "Container image for docker/podman/apple-container. Empty = `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu` or `:cuda12` (see `soundLab.mlx.gpu`)."
+        },
+        "soundLab.mlx.gpu": {
+          "type": "string",
+          "enum": [
+            "none",
+            "nvidia"
+          ],
+          "default": "none",
+          "markdownDescription": "`nvidia` uses the `:cuda12` image (pip `mlx[cuda12]`) with GPU passthrough. Needs an NVIDIA GPU, driver ≥ 550 and the NVIDIA Container Toolkit."
         },
         "soundLab.mlx.autoStart": {
           "type": "boolean",

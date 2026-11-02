@@ -10,8 +10,8 @@ Request: $ARGUMENTS
 
 1. `capabilities`: confirm a speech backend is available. If none is, offer one:
    - Apple Silicon: `mlx_service { action: "start", mode: "native" }` (needs `pip install "mlx-audio[server]"`), or `pip install mlx-whisper`.
-   - Linux: `mlx_service { action: "start", mode: "docker" }` (the CPU `:cpu` image), or `external` pointing at a Mac that runs the service natively.
-   - Anywhere: whisper.cpp, or an API key.
+   - Linux + NVIDIA: `mlx_service { action: "start", mode: "docker" }` with the `mlx_gpu: nvidia` setting (`:cuda12` image).
+   - Anywhere: the `:cpu` container, whisper.cpp, or an API key.
 2. Start the job:
    ```text
    transcribe { inputs: ["<path or glob>"], language: "auto", formats: ["srt","vtt","txt","json"], prompt: "<names, jargon>" }

@@ -27,7 +27,7 @@ let server, port, client;
 test.before(async () => {
   port = await freePort();
   server = spawn(process.execPath, [path.join(__dirname, 'fixtures', 'mock-mlx-audio.js'), String(port)], { env: { ...process.env, MOCK_MLX_LOG: reqLog }, stdio: 'ignore' });
-  client = new MlxAudioClient({ mode: 'external', port, image: 'x', python: 'python3', hfCache: p('hf'), logDir: p('logs'), voicesDir: p('voices') });
+  client = new MlxAudioClient({ mode: 'external', port, image: 'x', gpu: 'none', python: 'python3', hfCache: p('hf'), logDir: p('logs'), voicesDir: p('voices') });
   await client.waitReady(15000);
 });
 test.after(() => { server?.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
@@ -61,15 +61,15 @@ test('ref_audio is a server-side path: host path natively, /soundlab/voices/… 
   assert.equal(client.serverPath(p('voices/me/reference.wav'), 'native'), p('voices/me/reference.wav'));
   assert.equal(client.serverPath(p('voices/me/reference.wav'), 'docker'), '/soundlab/voices/me/reference.wav');
   assert.throws(() => client.serverPath('/elsewhere/ref.wav', 'podman'), /voices folder/);
-  const plan = new MlxAudioClient({ ...client.cfg, mode: 'docker', image: 'ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu' }).plan();
+  const plan = new MlxAudioClient({ ...client.cfg, mode: 'docker', gpu: 'nvidia', image: 'ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cuda12' }).plan();
   assert.ok(plan.args.join(' ').includes(`-v ${p('voices')}:/soundlab/voices:ro`));
-  assert.ok(!plan.args.includes('--gpus'), 'MLX containers are CPU-only');
+  assert.ok(plan.args.includes('--gpus'));
   await assert.rejects(client.speech('hi', { model: 'm', refAudio: '/missing/ref.wav' }), /Reference audio file not found/);
 });
 
 test('docker lifecycle via fake CLI; apple-container plan; external refuses to start', async () => {
   const p2 = await freePort();
-  const c = new MlxAudioClient({ mode: 'docker', port: p2, image: 'img:cpu', python: 'python3', hfCache: p('hf'), logDir: p('logs2'), voicesDir: p('voices'), binaries: { docker: path.join(BIN, 'docker') } });
+  const c = new MlxAudioClient({ mode: 'docker', port: p2, image: 'img:cpu', gpu: 'none', python: 'python3', hfCache: p('hf'), logDir: p('logs2'), voicesDir: p('voices'), binaries: { docker: path.join(BIN, 'docker') } });
   process.env.FAKE_CONTAINER_STATE = p('fake');
   const r = await c.start({ timeoutMs: 20000 });
   assert.equal(r.started, true);
@@ -85,7 +85,7 @@ test('docker lifecycle via fake CLI; apple-container plan; external refuses to s
 test('native start fails fast with an install hint when mlx-audio is missing', async () => {
   const fakePy = p('fakepy.sh');
   fs.writeFileSync(fakePy, '#!/bin/sh\necho "No module named \'uvicorn\'" >&2\nexit 1\n'); fs.chmodSync(fakePy, 0o755);
-  const c = new MlxAudioClient({ mode: 'native', port: await freePort(), image: '', python: fakePy, hfCache: p('hf'), logDir: p('logs3'), binaries: { 'mlx_audio.server': fakePy } });
+  const c = new MlxAudioClient({ mode: 'native', port: await freePort(), image: '', gpu: 'none', python: fakePy, hfCache: p('hf'), logDir: p('logs3'), binaries: { 'mlx_audio.server': fakePy } });
   const t0 = Date.now();
   await assert.rejects(c.start({ timeoutMs: 30000 }), /pip install "mlx-audio\[server\]"/);
   assert.ok(Date.now() - t0 < 10000);

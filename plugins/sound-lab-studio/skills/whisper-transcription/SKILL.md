@@ -1,12 +1,12 @@
 ---
 name: whisper-transcription
-description: Speech-to-text with Whisper-family models via MLX (Apple GPU natively, or CPU containers), whisper.cpp, OpenAI-compatible APIs or FFmpeg 8 — model choice, language/translation, prompts, chunking, subtitle formats and quality rules. Use for transcription, captions, subtitles or translation of audio/video.
+description: Speech-to-text with Whisper-family models via MLX (Apple GPU or mlx[cuda12] containers), whisper.cpp, OpenAI-compatible APIs or FFmpeg 8 — model choice, language/translation, prompts, chunking, subtitle formats and quality rules. Use for transcription, captions, subtitles or translation of audio/video.
 ---
 
 # Whisper transcription
 
 ## Pick a backend (the MCP `transcribe` tool does this with `backend: auto`)
-1. **mlx-service**: the mlx-audio server. Native on macOS (Metal), or a CPU Docker/Podman/Apple container (`mlx[cpu]`). It starts automatically when `autostart` is on.
+1. **mlx-service**: the mlx-audio server. Native on macOS (Metal), or a Docker/Podman/Apple container (`mlx[cuda12]` on NVIDIA, `mlx[cpu]` otherwise). It starts automatically when `autostart` is on.
 2. **mlx**: the `mlx_whisper` CLI on Apple Silicon.
 3. **whisper.cpp**: `whisper-cli` with a ggml model (Metal on macOS, CUDA/Vulkan/CPU elsewhere). It can also run in the `whisper-vulkan` container.
 4. **openai**: any OpenAI-compatible `/audio/transcriptions` endpoint (`OPENAI_API_KEY`). Files are uploaded as 16 kHz mono FLAC in 10-minute chunks.

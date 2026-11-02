@@ -1,6 +1,6 @@
 'use strict';
 // Speech-to-text backends. Every backend returns {segments:[{start,end,text}], language?, backend}.
-//   mlx-service  HTTP → mlx-audio server (native Metal, or docker/podman/apple-container with mlx[cpu])
+//   mlx-service  HTTP → mlx-audio server (native Metal, or docker/podman/apple-container with mlx[cuda12]/mlx[cpu])
 //   mlx          local `mlx_whisper` CLI (Apple Silicon, Metal)
 //   whisper.cpp  local `whisper-cli` (Metal on macOS, CUDA/Vulkan/CPU elsewhere) — or inside a container runner
 //   openai       any OpenAI-compatible /audio/transcriptions endpoint

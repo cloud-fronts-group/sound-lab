@@ -1,6 +1,6 @@
 # Sound Lab Studio — Claude Code plugin
 
-Sound Lab Studio is a Claude Code plugin for audio and video work. It covers FFmpeg dubbing, sound design, Whisper/MLX speech, and MP3/MP4 expertise. It also includes an MCP server that runs long media jobs in the background, either on your Mac's GPU, in Docker/Podman/Apple containers, or against an MLX inference service.
+Sound Lab Studio is a Claude Code plugin for audio and video work. It covers FFmpeg dubbing, sound design, Whisper/MLX speech, and MP3/MP4 expertise. It also includes an MCP server that runs long media jobs in the background, either on your Mac's GPU, in Docker/Podman/Apple containers, or against an MLX inference service (`mlx[cuda12]` on NVIDIA).
 
 ## Install
 ```text
@@ -13,6 +13,7 @@ Then `/plugin` → **Sound Lab Studio** → *Configure* to set the runner, the M
 - Node 18+ and `ffmpeg`/`ffprobe` on PATH (`brew install ffmpeg` · `apt install ffmpeg` · `winget install ffmpeg`).
 - Optional, by feature:
   - Apple Silicon speech: `pip install "mlx-audio[server]"` (MLX service) or `pip install mlx-whisper`.
+  - NVIDIA: Docker plus the NVIDIA Container Toolkit for the `:cuda12` image.
   - whisper.cpp with a ggml model.
   - `OPENAI_API_KEY` for an OpenAI-compatible speech API.
 
@@ -56,16 +57,18 @@ Then `/plugin` → **Sound Lab Studio** → *Configure* to set the runner, the M
 | `runner: local` (default) | host ffmpeg | Apple VideoToolbox/AudioToolbox on Macs, NVENC etc. elsewhere |
 | `runner: docker`/`podman` | `ghcr.io/cloud-fronts-group/sound-lab-ffmpeg` | CPU. `container_gpu: nvidia` or `dri` for passthrough |
 | `mlx_mode: native` (default on Apple Silicon) | host `mlx_audio.server` | **Apple GPU (Metal)** |
+| `mlx_mode: docker`/`podman` + `mlx_gpu: nvidia` | `…/sound-lab-mlx-audio:cuda12` (`pip install mlx[cuda12]`) | **NVIDIA CUDA 12** |
 | `mlx_mode: docker`/`podman`/`apple-container` | `…/sound-lab-mlx-audio:cpu` (`mlx[cpu]`) | CPU |
 | `mlx_mode: external` | any mlx-audio server at `mlx_url` | wherever it runs |
 
-MLX only uses a GPU natively on Apple Silicon. The MLX container image is CPU-only (`mlx[cpu]`), for Linux servers and isolated setups, and Docker Desktop and Apple's `container` can't reach Metal anyway. The fast path on a Mac is `native`. For GPU work inside a container on macOS, use Podman with a libkrun machine (Vulkan → Metal) and the `whisper-vulkan` image (`container_gpu: dri`).
+Docker Desktop and Apple's `container` run Linux VMs that **cannot reach Metal**, so MLX inside them on a Mac runs on the CPU. The fast path on a Mac is `native`. For GPU work inside a container on macOS, use Podman with a libkrun machine (Vulkan → Metal) and the `whisper-vulkan` image (`container_gpu: dri`).
 
 ## Containers
-Sources are in [`containers/`](containers/), and GitHub Actions publishes them to GHCR (`.github/workflows/containers.yml`).
+Sources are in [`containers/`](containers/). GitHub Actions publishes the ffmpeg and whisper-vulkan images to GHCR (`.github/workflows/containers.yml`). The MLX audio image isn't built in CI: build it locally with the `cpu` or `cuda` compose profile below.
 ```bash
 cd containers
 docker compose --profile cpu  up -d mlx-audio-cpu        # MLX audio service, CPU, :8000
+docker compose --profile cuda up -d mlx-audio-cuda       # MLX audio service, mlx[cuda12], NVIDIA
 docker compose --profile build build ffmpeg whisper-vulkan
 ```
 
@@ -83,4 +86,5 @@ node scripts/keyboard-synth.js --keymap
 npm test         # 23 tests: MCP protocol + jobs against real ffmpeg, MLX service lifecycle via mock server & fake docker/podman/container CLIs, hooks, dubbing, SFX, synth
 npm run validate # claude plugin validate (plugin + marketplace)
 SOUND_LAB_TEST_MLX_URL=http://127.0.0.1:8000 npm test            # also hit a real mlx-audio server
+SOUND_LAB_TEST_CUDA_PYTHON=/venv-with-mlx-cuda12/bin/python npm test  # real mlx[cuda12] start-up check
 ```

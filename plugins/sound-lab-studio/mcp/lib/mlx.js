@@ -3,10 +3,10 @@
 //
 // The same HTTP API is served from wherever you run it. Pick the mode by hardware:
 //   native           host Python on macOS → MLX on the Apple GPU (Metal). Fastest on Apple Silicon.
-//   docker / podman  Linux container with `mlx[cpu]` (the :cpu image). Containers on macOS never see Metal, so they
-//                    run on the CPU there too.
+//   docker / podman  Linux container. Image tag :cuda12 = `mlx[cuda12]` on NVIDIA GPUs (needs --gpus / CDI);
+//                    tag :cpu = `mlx[cpu]`. Containers on macOS never see Metal, so on a Mac they run on the CPU.
 //   apple-container  Apple's `container` CLI (macOS 26, Apple silicon): Linux micro-VM, CPU MLX.
-//   external         any already-running server at `url` (another machine, a sidecar).
+//   external         any already-running server at `url` (another machine, a GPU box, a sidecar).
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
@@ -16,7 +16,7 @@ const CONTAINER_PORT = 8000;
 
 class MlxService {
   /**
-   * @param {{mode: string, url: string, port: number, image: string, hfCache: string, dataDir: string,
+   * @param {{mode: string, url: string, port: number, image: string, gpu: string, hfCache: string, dataDir: string,
    *          sttModel: string, ttsModel: string, ttsVoice: string, binaries?: Record<string,string>, which: (c:string)=>string|null}} cfg
    */
   constructor(cfg) {
@@ -70,7 +70,9 @@ class MlxService {
       await new Promise(r => setTimeout(r, 1000));
     }
     const logs = this.logs(this.cfg.mode, 12);
-    const hint = /No module named|ModuleNotFoundError/.test(logs) ? ' Install the server extras: pip install "mlx-audio[server]".' : '';
+    const hint = /libcuda\.so|CUDA driver|no CUDA-capable device/i.test(logs)
+      ? ' The :cuda12 image needs an NVIDIA GPU + driver on the host (NVIDIA Container Toolkit, mlx_gpu "nvidia"). Use the :cpu image (mlx_gpu "none") or mode "native" on Apple Silicon.'
+      : /No module named|ModuleNotFoundError/.test(logs) ? ' Install the server extras: pip install "mlx-audio[server]".' : '';
     throw new Error(`MLX audio service did not become ready at ${this.url} within ${Math.round(timeoutMs / 1000)} s.${hint}\nRecent log:\n${logs}`);
   }
 
@@ -137,7 +139,8 @@ class MlxService {
           : { cmd: this.bin('python3'), args: ['-m', 'mlx_audio.server', '--host', '127.0.0.1', '--port', port] };
       }
       case 'docker': case 'podman': {
-        return { cmd: this.bin(mode), args: ['run', '-d', '--rm', '--name', CONTAINER_NAME, '-p', `127.0.0.1:${port}:${CONTAINER_PORT}`, '-v', `${hf}:/root/.cache/huggingface`, this.cfg.image] };
+        const gpu = this.cfg.gpu === 'nvidia' ? (mode === 'podman' ? ['--device', 'nvidia.com/gpu=all'] : ['--gpus', 'all']) : [];
+        return { cmd: this.bin(mode), args: ['run', '-d', '--rm', '--name', CONTAINER_NAME, '-p', `127.0.0.1:${port}:${CONTAINER_PORT}`, '-v', `${hf}:/root/.cache/huggingface`, ...gpu, this.cfg.image] };
       }
       case 'apple-container':
         return { cmd: this.bin('container'), args: ['run', '-d', '--rm', '--name', CONTAINER_NAME, '-p', `127.0.0.1:${port}:${CONTAINER_PORT}`, '-v', `${hf}:/root/.cache/huggingface`, this.cfg.image] };

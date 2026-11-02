@@ -170,7 +170,7 @@ jobs:
             echo "- **VS Code extension:** download \`sound-lab-$VERSION.vsix\` below and run \`code --install-extension sound-lab-$VERSION.vsix\`, or install *Sound Lab* from the Marketplace."
             echo "- **Claude Code plugin:** \`/plugin marketplace add $GITHUB_REPOSITORY\` then \`/plugin install sound-lab-studio@sound-lab\` (\`/plugin marketplace update sound-lab\` to upgrade)."
             if [ "$CONTAINERS" = true ]; then
-              echo "- **Containers:** \`ghcr.io/$owner/sound-lab-ffmpeg:$VERSION\`, \`ghcr.io/$owner/sound-lab-mlx-audio:$VERSION-cpu\`, \`ghcr.io/$owner/sound-lab-whisper-vulkan:$VERSION\`."
+              echo "- **Containers:** \`ghcr.io/$owner/sound-lab-ffmpeg:$VERSION\`, \`ghcr.io/$owner/sound-lab-whisper-vulkan:$VERSION\`."
             fi
           } >> notes.md
           cat notes.md
