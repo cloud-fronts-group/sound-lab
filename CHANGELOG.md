@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **CI/CD**: GitHub Actions CI on every pull request (Linux + macOS, real ffmpeg, webview UI harness, plugin tests and validation), and a one-click Release workflow that versions the extension and plugin together and publishes the VSIX, plugin zip, Marketplace/Open VSX listing and versioned container images.
 - **mlx-audio integration**:
   - Lifecycle for the API server: native (Apple GPU), docker/podman (`mlx[cuda12]` or `mlx[cpu]`), Apple `container` or external, with a status bar item and quick actions.
   - MLX Audio sidebar panel (TTS with live voice lists, transcription, separation, models).

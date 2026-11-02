@@ -1,0 +1,240 @@
+name: Release
+
+# Two ways in:
+#  1. Actions → Release → Run workflow (from main). Picks the next version, runs CI, then commits the version bump +
+#     dated CHANGELOG to main, tags vX.Y.Z and publishes everything below. This is the normal path.
+#  2. Push a vX.Y.Z tag yourself (after running `node scripts/version.js bump …` and committing). CI runs on the tag,
+#     then the same build/publish jobs run.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump (ignored when "version" is set)
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: Explicit version X.Y.Z (optional)
+        type: string
+        required: false
+      pre_release:
+        description: Mark as pre-release (GitHub pre-release + VS Code Marketplace pre-release channel)
+        type: boolean
+        default: false
+      publish:
+        description: Publish the extension to the VS Code Marketplace / Open VSX (needs VSCE_PAT / OVSX_PAT secrets)
+        type: boolean
+        default: true
+      containers:
+        description: Build and push versioned container images to GHCR
+        type: boolean
+        default: true
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      pre_release: ${{ steps.plan.outputs.pre_release }}
+      publish: ${{ steps.plan.outputs.publish }}
+      containers: ${{ steps.plan.outputs.containers }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          BUMP: ${{ inputs.bump }}
+          EXPLICIT: ${{ inputs.version }}
+          PRE: ${{ inputs.pre_release }}
+          PUBLISH: ${{ inputs.publish }}
+          CONTAINERS: ${{ inputs.containers }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then
+            if [ "$GITHUB_REF" != refs/heads/main ]; then
+              echo "::error::Run the Release workflow from main (got $GITHUB_REF)."; exit 1
+            fi
+            version=$(node scripts/version.js next "${EXPLICIT:-$BUMP}")
+            # Fails early if the CHANGELOG has nothing under "## Unreleased".
+            node scripts/version.js bump "$version" --dry-run >/dev/null
+            if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+              echo "::error::Tag v$version already exists."; exit 1
+            fi
+            pre="$PRE"; publish="$PUBLISH"; containers="$CONTAINERS"
+          else
+            node scripts/version.js check --tag "$GITHUB_REF_NAME"
+            version=$(node scripts/version.js current)
+            pre=false; publish=true; containers=true
+          fi
+          {
+            echo "version=$version"
+            echo "tag=v$version"
+            echo "pre_release=$pre"
+            echo "publish=$publish"
+            echo "containers=$containers"
+          } >> "$GITHUB_OUTPUT"
+          echo "### Releasing v$version" >> "$GITHUB_STEP_SUMMARY"
+
+  ci:
+    name: CI
+    needs: plan
+    uses: ./.github/workflows/ci.yml
+
+  tag:
+    name: Commit version bump and tag
+    if: github.event_name == 'workflow_dispatch'
+    needs: [plan, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }} # exactly the commit CI just tested
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - name: Bump, commit, tag, push
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          node scripts/version.js bump "$VERSION"
+          node scripts/version.js check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release v$VERSION"
+          git tag -a "v$VERSION" -m "Sound Lab v$VERSION"
+          # Atomic: either main moves and the tag appears, or neither does (e.g. main moved since CI started).
+          if ! git push --atomic origin "HEAD:refs/heads/main" "refs/tags/v$VERSION"; then
+            echo "::error::Could not push the release commit. If main moved while CI ran, re-run the Release workflow."
+            exit 1
+          fi
+
+  build:
+    name: Build and publish GitHub release
+    needs: [plan, ci, tag]
+    if: >-
+      always() && needs.plan.result == 'success' && needs.ci.result == 'success' &&
+      (needs.tag.result == 'success' || needs.tag.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      PRE_RELEASE: ${{ needs.plan.outputs.pre_release }}
+      CONTAINERS: ${{ needs.plan.outputs.containers }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.plan.outputs.tag }}
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - run: node scripts/version.js check --tag "$TAG"
+      - run: npm ci
+      - name: Package VS Code extension
+        run: |
+          mkdir -p dist
+          flags=()
+          if [ "$PRE_RELEASE" = true ]; then flags+=(--pre-release); fi
+          npx vsce package "${flags[@]}" --out "dist/sound-lab-$VERSION.vsix"
+      - name: Package Claude Code plugin
+        run: |
+          git archive --format=zip --prefix=sound-lab-studio/ -o "dist/sound-lab-studio-$VERSION.zip" "HEAD:plugins/sound-lab-studio"
+          (cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Release notes
+        id: notes
+        run: |
+          if node scripts/version.js notes "$VERSION" > notes.md; then
+            echo "from_changelog=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::CHANGELOG.md has no section for $VERSION; GitHub will generate notes from merged PRs."
+            echo "from_changelog=false" >> "$GITHUB_OUTPUT"
+            : > notes.md
+          fi
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo
+            echo "## Install"
+            echo "- **VS Code extension:** download \`sound-lab-$VERSION.vsix\` below and run \`code --install-extension sound-lab-$VERSION.vsix\`, or install *Sound Lab* from the Marketplace."
+            echo "- **Claude Code plugin:** \`/plugin marketplace add $GITHUB_REPOSITORY\` then \`/plugin install sound-lab-studio@sound-lab\` (\`/plugin marketplace update sound-lab\` to upgrade)."
+            if [ "$CONTAINERS" = true ]; then
+              echo "- **Containers:** \`ghcr.io/$owner/sound-lab-ffmpeg:$VERSION\`, \`ghcr.io/$owner/sound-lab-mlx-audio:$VERSION-cpu\` / \`:$VERSION-cuda12\`, \`ghcr.io/$owner/sound-lab-whisper-vulkan:$VERSION\`."
+            fi
+          } >> notes.md
+          cat notes.md
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM_CHANGELOG: ${{ steps.notes.outputs.from_changelog }}
+        run: |
+          flags=()
+          if [ "$PRE_RELEASE" = true ]; then flags+=(--prerelease); else flags+=(--latest); fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Re-run of a release: refresh the assets and notes instead of failing.
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md "${flags[@]}"
+          else
+            if [ "$FROM_CHANGELOG" != true ]; then flags+=(--generate-notes); fi
+            gh release create "$TAG" dist/* --verify-tag --title "Sound Lab $TAG" --notes-file notes.md "${flags[@]}"
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ needs.plan.outputs.version }}
+          path: dist/
+
+  marketplace:
+    name: Publish to VS Code Marketplace / Open VSX
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    # Holds the VSCE_PAT / OVSX_PAT secrets; add required reviewers to this environment to gate publishing.
+    environment: marketplace
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-${{ needs.plan.outputs.version }}
+          path: dist
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - name: Publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          VSIX: dist/sound-lab-${{ needs.plan.outputs.version }}.vsix
+        run: |
+          published=0
+          if [ -n "$VSCE_PAT" ]; then
+            npx -y @vscode/vsce@3 publish --packagePath "$VSIX"   # reads VSCE_PAT from the environment
+            echo "- Published to the VS Code Marketplace" >> "$GITHUB_STEP_SUMMARY"; published=1
+          fi
+          if [ -n "$OVSX_PAT" ]; then
+            npx -y ovsx publish "$VSIX" -p "$OVSX_PAT"
+            echo "- Published to Open VSX" >> "$GITHUB_STEP_SUMMARY"; published=1
+          fi
+          if [ "$published" = 0 ]; then
+            echo "::notice::No VSCE_PAT or OVSX_PAT secret in the 'marketplace' environment; skipped Marketplace publishing."
+          fi
+
+  containers:
+    name: Versioned container images
+    needs: [plan, build]
+    if: needs.plan.outputs.containers == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/containers.yml
+    with:
+      ref: refs/tags/${{ needs.plan.outputs.tag }}
+      version: ${{ needs.plan.outputs.version }}

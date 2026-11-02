@@ -19,6 +19,12 @@ Use `FFMPEG=/path FFPROBE=/path npm test` to test against a different ffmpeg bui
 - Claude Code plugin marketplace: `.claude-plugin/marketplace.json` → `plugins/sound-lab-studio/` (skills, agents, hooks, zero-dependency MCP server in `mcp/`, scripts, containers). Tests: `cd plugins/sound-lab-studio && npm test`. Validate: `claude plugin validate plugins/sound-lab-studio && claude plugin validate .`
 - Container images: `plugins/sound-lab-studio/containers/` (built by `.github/workflows/containers.yml` to GHCR).
 
+## CI, versioning and releases
+- `.github/workflows/ci.yml` runs on every PR and push to `main`: version lockstep check, `npm test` (Ubuntu Node 20/22 + macOS), `npm run test:ui` (Playwright; screenshots uploaded as an artifact), plugin tests (Node 20/22) + `claude plugin validate`, and a VSIX artifact.
+- **One version for everything.** `package.json`, `package-lock.json`, `plugins/sound-lab-studio/package.json` and its `.claude-plugin/plugin.json` must always match. Change them only with `node scripts/version.js bump <patch|minor|major|X.Y.Z>`, never by hand (`node scripts/version.js check` is in CI).
+- Every user-visible change adds a line under `## Unreleased` in `CHANGELOG.md`. A release refuses to run if that section is empty, and its text becomes the GitHub release notes.
+- Releasing: Actions → **Release** → Run workflow (on `main`, pick patch/minor/major). It runs CI, commits `Release vX.Y.Z` + tag to `main`, builds `sound-lab-X.Y.Z.vsix`, `sound-lab-studio-X.Y.Z.zip` and `SHA256SUMS.txt`, creates the GitHub release, publishes to the VS Code Marketplace / Open VSX when the `VSCE_PAT` / `OVSX_PAT` secrets exist in the `marketplace` environment, and pushes `:X.Y.Z`-tagged GHCR images. Pushing a `vX.Y.Z` tag yourself runs the same pipeline.
+
 ## Architecture
 
 ```

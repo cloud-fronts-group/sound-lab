@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # The Release workflow runs exactly this suite before it tags anything.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PLAYWRIGHT_VERSION: 1.63.0
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+
+jobs:
+  versions:
+    name: Version lockstep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22 }
+      - run: node scripts/version.js check
+
+  extension:
+    name: Extension (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, node: 20 }
+          - { os: ubuntu-latest, node: 22, package: true }
+          - { os: macos-latest,  node: 22 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: "${{ matrix.node }}", cache: npm }
+      - name: Install ffmpeg
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then brew install ffmpeg; else sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; fi
+          ffmpeg -hide_banner -version | head -1
+      - run: npm ci
+      - name: Unit + integration tests (real ffmpeg)
+        run: npm test
+      - name: Package VSIX
+        if: matrix.package
+        run: |
+          mkdir -p dist
+          npx vsce package --out "dist/sound-lab-$(node scripts/version.js current)-${GITHUB_SHA::7}.vsix"
+          npx vsce ls --tree | tee dist/vsix-contents.txt
+      - uses: actions/upload-artifact@v7
+        if: matrix.package
+        with:
+          name: vsix
+          path: dist/
+          retention-days: 14
+
+  ui:
+    name: Webview UI harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: npm ci
+      - name: Install Playwright + Chromium
+        run: |
+          npm install --no-save "playwright@${PLAYWRIGHT_VERSION}"
+          npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ui-screenshots
+          path: test/ui/out/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  plugin:
+    name: Claude Code plugin (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    defaults:
+      run:
+        working-directory: plugins/sound-lab-studio
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: "${{ matrix.node }}" }
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Plugin tests (MCP server, hooks, dubbing, SFX, MLX lifecycle)
+        run: npm test
+      - name: Validate plugin + marketplace manifests
+        if: matrix.node == 22
+        env:
+          DISABLE_AUTOUPDATER: "1"
+        run: |
+          npx -y @anthropic-ai/claude-code plugin validate .
+          npx -y @anthropic-ai/claude-code plugin validate ../..

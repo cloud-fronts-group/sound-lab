@@ -137,6 +137,9 @@ npm run package   # → sound-lab-0.1.0.vsix
 ```
 Press F5 in VS Code with this folder open to launch an Extension Development Host.
 
+### CI and releases
+GitHub Actions tests every pull request against real ffmpeg on Linux and macOS, runs the webview UI harness and the Claude Code plugin suite, and attaches a VSIX build. To release, add your changes under `## Unreleased` in `CHANGELOG.md`, then run **Actions → Release → Run workflow** and pick `patch`, `minor` or `major`. The workflow bumps the extension and plugin versions together, tags `vX.Y.Z`, and publishes a GitHub release with the VSIX and the plugin zip. It also publishes to the Marketplace and Open VSX (when the `VSCE_PAT` / `OVSX_PAT` secrets are set in the `marketplace` environment) and pushes versioned container images.
+
 ### Working on it with Claude Code
 This repo is set up as a Claude Code project:
 
