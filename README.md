@@ -70,6 +70,32 @@ Sound Lab connects to the **[mlx-audio](https://github.com/Blaizzy/mlx-audio) AP
 
 Voices live in VS Code's extension storage, and Sound Lab mounts them read-only into container modes, because mlx-audio reads `ref_audio` from the server's own disk. Only clone your own voice, or a voice you have explicit permission to use.
 
+### Sound Lab Studio: create and DJ
+**Open Sound Lab Studio** (command palette, the audio editor's title bar, or the MLX Audio sidebar's *Studio* button) opens an editor tab with two ribbons of icon tools. Each tool opens a drawer beside the page. You get a result you can play, open, reveal or chain into the next tool. mlx-audio Studio runs in the same tab when it's started.
+
+**Create.** Tempo, key and scale are shared, so everything you make lines up:
+- **Instrumental**: drums, voice-led chords, bass and a lead in 9 genres: lo-fi, pop, house, trap, R&B/neo-soul, drum & bass, reggaeton, ambient and cinematic. You choose a seamless loop or a song with an intro and a ring-out. Use a preset progression or type your own (`Am F C G`, `ii7 V7 Imaj7`).
+- **Beats**: 7 styles (house, boom bap, trap with hi-hat rolls, lo-fi, rock, drum & bass, reggaeton) with swing, fills and humanized timing. Loops are sample-exact and wrap their reverb tails, so they tile without a click.
+- **Chords**: roman numerals or chord names on a pad, electric piano, keys, Karplus-Strong pluck, FM bell, organ, strings or lead. Rhythms are sustained, strummed, off-beat stabs, 8th pulse or 16th arpeggio.
+- **Sound FX**: riser, downlifter, whoosh, impact, sub drop, air horn, vinyl scratch, laser, explosion, beds and UI sounds. Risers and beds can be sized in bars of your tempo.
+- **Auto-tune**: pitch-corrects a vocal to the key (detected or chosen) with retune speed and amount. 0 ms gives the hard snap, ~40 ms sounds natural, and 150 ms+ keeps vibrato. It uses YIN pitch tracking, scale snapping with hysteresis and PSOLA shifting, so length, rate and channels are unchanged.
+- **Layer**: drops any generated part onto a track. The part is looped to fill the track, offset, levelled and optionally ducked under it.
+
+**DJ.** Every move detects the tempo, beat grid, downbeats and key (with Camelot code) first, so it lands on the beat. Use ×2 / ÷2 when a track reads half- or double-time.
+
+| Tool | What it does |
+|---|---|
+| Backspin | The platter is yanked backwards on a beat, whips to about −3× and slows to a stop. Then it stops, or rewinds to the start of the phrase. |
+| Echo out | The track stops on a downbeat, and its last beat trails off on a 1- or ½-beat echo with a rising high-pass. |
+| Beat jump | Skips forward or loops back by N beats, with a 6 ms crossfade. |
+| Double drop | Tempo-matches track B and lines its drop (auto-detected) up with A's drop on the same downbeat. B rides in over 8 bars, both drops play together with one bass line, then A hands over. |
+| Quick mix | A 1–4 bar beat-matched cut into B with a bass swap. |
+| Long blend | An 8–32 bar blend: B's highs come in, the basses swap halfway, then A's highs go out. |
+| Mashup | Vocals of one song over the instrumental of another. They're separated if needed, tempo-matched, aligned downbeat-to-downbeat, optionally shifted to the instrumental's key, with the bed ducked under the voice. |
+| Acapella / Instrumental | Splits vocals from music. Uses mlx-audio AI separation when its server is running. Otherwise a built-in center-channel extractor (STFT similarity mask) handles stereo mixes with centered vocals. Set `soundLab.dj.separation` to choose. |
+
+The same moves are one click away in the explorer's **Sound Lab → Sound Lab DJ** menu (select two files for the two-track moves) and in the audio editor's **DJ** row, which acts at the playhead. New material goes to `sound-lab-studio/` in your workspace (`soundLab.studio.outputDirectory`). Edits of a track are written next to it, in its format, and never overwrite it.
+
 ### Samples view
 The **Sound Lab** activity bar view lists every audio file in the workspace, grouped by folder. Expand a file to see its duration, codec, sample rate, channels, bit depth and tags. Right-click a file for every action.
 

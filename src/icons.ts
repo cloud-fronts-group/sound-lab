@@ -1,5 +1,5 @@
 // Webview button icons (24x24 grid, stroked paths). Generated set; edit paths here.
-// Every button in media/editor.js and audioEditor.ts must use one of these (enforced by test/activation.test.js).
+// Every button in the webviews (editor, MLX panel, Studio, Voice Clone) must use one of these (enforced by test/activation.test.js).
 export const ICONS: Record<string, string> = {
   'play': 'M7 4l13 8-13 8z',
   'pause': 'M7 4h3v16H7zM14 4h3v16h-3z',
@@ -41,6 +41,26 @@ export const ICONS: Record<string, string> = {
   'folder': 'M3 6h6l2 2h10v11H3z',
   'arrow-right': 'M5 12h14M13 6l6 6-6 6',
   'arrow-left': 'M19 12H5M11 6l-6 6 6 6',
+  'instrumental': 'M3 5h18v14H3zM9 5v14M15 5v14M7 5v8h4V5M13 5v8h4V5',
+  'beats': 'M4 10c0-1.9 3.6-3.5 8-3.5s8 1.6 8 3.5v5c0 1.9-3.6 3.5-8 3.5S4 16.9 4 15zM4 10c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5M7 2l4 5M17 2l-4 5',
+  'chords': 'M9 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0M9 13a2 2 0 1 1-4 0 2 2 0 0 1 4 0M9 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0M9 18V3c2 1.5 6 2 7 5M14 13h7M14 17h5',
+  'sfx': 'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8',
+  'autotune': 'M3 15h5v-4h5V7h8M3 19c2.5 0 3.5-6 6-6s3-5 6-5 3.5-3 6-3',
+  'layers': 'M12 3l9 5-9 5-9-5zM3 12.5l9 5 9-5M3 16.5l9 5 9-5',
+  'backspin': 'M3 12a9 9 0 1 0 2.6-6.4M5.5 2.5v3.7h3.7M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+  'echo-out': 'M4 6v12M9 8v8M13.5 9.5v5M17.5 10.8v2.4M21 11.8v.4',
+  'beat-jump': 'M4 19h.01M9 19h.01M14 19h.01M19 19h.01M4 15c2-8 13-8 15 0M19 15l-3.2-1.2M19 15l.8-3.3',
+  'double-drop': 'M7 3v11M3.5 10.5L7 14l3.5-3.5M17 3v11M13.5 10.5L17 14l3.5-3.5M3 20h18',
+  'quick-mix': 'M3 6h4l10 12h4M3 18h4l10-12h4',
+  'long-blend': 'M2 7c7 0 13 10 20 10M2 17c7 0 13-10 20-10',
+  'mashup': 'M15 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0M21 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0',
+  'acapella': 'M10 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3M4 10a6 6 0 0 0 12 0M10 16v4M19 4v8M19 4l2.5 1M19 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0',
+  'no-vocals': 'M12 8V6a3 3 0 0 0-6 0v5a3 3 0 0 0 4.5 2.6M3 10a6 6 0 0 0 9.5 4.9M9 16v4M2 2l14 14M19 5v8M19 5l2.5 1M19 13a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0',
+  'detect': 'M9 3h6l4 18H5zM12 17l4-10M8 14h8',
+  'chevrons-up': 'M7 11l5-5 5 5M7 18l5-5 5 5',
+  'chevrons-down': 'M7 6l5 5 5-5M7 13l5 5 5-5',
+  'wand': 'M4 20L15 9M14 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 10l.6 1.4 1.4.6-1.4.6L19 14l-.6-1.4-1.4-.6 1.4-.6z',
+  'close': 'M6 6l12 12M18 6L6 18',
 };
 
 /** Hidden SVG sprite: inlined once in the webview HTML; buttons reference it with <use href="#sl-name">. */
