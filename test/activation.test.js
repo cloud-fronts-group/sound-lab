@@ -63,5 +63,17 @@ test('activate registers every contributed command, view and editor', async () =
   // webview action buttons map to real commands
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'audioEditor.ts'), 'utf8');
   for (const [, id] of html.matchAll(/data-run="(\w+)"/g)) { assert.ok(declared.includes(`soundLab.${id}`), `button runs unknown soundLab.${id}`); }
+  // every command and every webview button carries an SVG icon
+  for (const c of pkg.contributes.commands) {
+    assert.ok(c.icon && c.icon.light && c.icon.dark, `${c.command} has no light/dark SVG icon`);
+    for (const p of [c.icon.light, c.icon.dark]) { assert.ok(fs.existsSync(path.join(__dirname, '..', p)), `${c.command} icon missing: ${p}`); }
+  }
+  const icons = fs.readFileSync(path.join(__dirname, '..', 'src', 'icons.ts'), 'utf8');
+  const known = new Set([...icons.matchAll(/^\s+'([\w-]+)': '/gm)].map(m => m[1]));
+  const editorJs = fs.readFileSync(path.join(__dirname, '..', 'media', 'editor.js'), 'utf8');
+  for (const [, name] of (html + editorJs).matchAll(/(?:icon|ic)\('([\w-]+)'\)/g)) { assert.ok(known.has(name), `button uses unknown icon '${name}'`); }
+  const tpl = html.slice(html.indexOf('<body>'));
+  for (const [, tag] of tpl.matchAll(/(<button\b[^>]*>[\s\S]*?<\/button>)/g)) { assert.ok(/icon\('[\w-]+'\)/.test(tag), `webview button without icon: ${tag.slice(0, 80)}`); }
+  assert.ok(/ic\('transcribe'\)\+'Transcribe now/.test(editorJs), 'Transcribe now button needs its icon');
   await new Promise(r => setTimeout(r, 300)); // let capability detection settle
 });
