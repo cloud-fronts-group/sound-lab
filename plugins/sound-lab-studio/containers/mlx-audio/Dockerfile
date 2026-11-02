@@ -22,12 +22,12 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg espeak-ng libsndfile1 curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-# mlx-audio[server] pulls in webrtcvad, which ships no wheels and has to be compiled, so gcc is installed
-# for this layer only and removed again afterwards.
+# mlx-audio[server] pulls in packages that have to be compiled: webrtcvad (no wheels at all) and, on arm64,
+# miniaudio (its build probes `c++`). The compilers are installed for this layer only and removed afterwards.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && apt-get install -y --no-install-recommends g++ libc6-dev \
  && pip install "mlx[cpu]" "mlx-audio[server]==${MLX_AUDIO_VERSION}" \
- && apt-get purge -y --auto-remove gcc libc6-dev \
+ && apt-get purge -y --auto-remove g++ libc6-dev \
  && rm -rf /var/lib/apt/lists/* \
  && python -c "import mlx.core as mx, mlx_audio; print('mlx', mx.__version__, mx.default_device())"
 
