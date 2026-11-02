@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "sound-lab",
+  "description": "Sound Lab plugins for Claude Code — FFmpeg dubbing, sound design, Whisper/MLX speech and media tooling.",
+  "owner": { "name": "Cloud Fronts Group", "url": "https://github.com/cloud-fronts-group" },
+  "plugins": [
+    {
+      "name": "sound-lab-studio",
+      "source": "./plugins/sound-lab-studio",
+      "description": "FFmpeg skills, dubbing commands (music beds, live streams, video), procedural SFX, Whisper + MP3/MP4 expert agents, safety hooks, and an MCP server for background batch ffmpeg, MLX speech-to-text/TTS/separation (native Apple GPU, mlx[cuda12] or CPU containers, Apple container) and Docker/Podman runners.",
+      "category": "media",
+      "tags": ["ffmpeg", "audio", "video", "dubbing", "sfx", "whisper", "mlx", "apple-silicon", "mcp"]
+    }
+  ]
+}

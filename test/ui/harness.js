@@ -74,13 +74,14 @@ const check = (cond, msg) => { console.log(`${cond ? '✔' : '✖'} ${msg}`); if
       .replace('<head>', `<head>${themeCss(theme)}<script>window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m)});</script>`)
       .replace('<body>', `<body class="vscode-${themeName}">`) // VS Code tags <body> with vscode-dark / vscode-light
       .replace(/<meta http-equiv="Content-Security-Policy"[^>]+>/, ''); // file:// pages can't satisfy webview CSP
+      ; // keep the real CSP: cspSource 'file:' covers the file:// test page, so CSP violations surface as page errors
     const pageFile = path.join(work, `page-${themeName}.html`);
     fs.writeFileSync(pageFile, html);
 
     const page = await browser.newPage({ viewport: { width: 1280, height: 980 } });
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    page.on('console', m => { if (m.type() === 'error') { errors.push(m.text()); } });
+    page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) { errors.push(m.text()); } });
     await page.goto('file://' + pageFile);
     await page.waitForFunction(() => window.__posted.some(m => m.type === 'ready'), null, { timeout: 5000 });
     const send = (m) => page.evaluate((m) => window.postMessage(m, '*'), m);
@@ -101,6 +102,8 @@ const check = (cond, msg) => { console.log(`${cond ? '✔' : '✖'} ${msg}`); if
     check((await page.locator('.region').count()) === segments.length, `${tag} ${segments.length} sound regions listed`);
     check((await page.locator('.seg').count()) === transcript.length, `${tag} transcript rows rendered`);
     check(/LUFS/.test(await page.textContent('#levelsBody')), `${tag} levels panel rendered`);
+    const widths = await page.$$eval('#levelsBody .meter > div', els => els.map(e => e.style.width));
+    check(widths.length === 3 && widths.every(w => /%$/.test(w) && parseFloat(w) > 0), `${tag} loudness meters filled under CSP (${widths.join(', ')})`);
 
     await page.evaluate(() => window.scrollTo(0, 0));
     const box = await page.locator('#wave').boundingBox();
