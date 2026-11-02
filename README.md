@@ -43,8 +43,7 @@ Sound Lab connects to the **[mlx-audio](https://github.com/Blaizzy/mlx-audio) AP
 | `soundLab.mlx.mode` | Runs | GPU |
 |---|---|---|
 | `auto` → `native` on Apple Silicon | `python -m mlx_audio.server` on your Mac (`pip install "mlx-audio[server]"`) | **Apple GPU (Metal)** |
-| `docker` / `podman` + `soundLab.mlx.gpu: nvidia` | `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cuda12` (`pip install mlx[cuda12]`) | **NVIDIA CUDA 12** |
-| `docker` / `podman` / `apple-container` | `…:cpu` image (`mlx[cpu]`) | CPU (containers on macOS cannot reach Metal) |
+| `docker` / `podman` / `apple-container` | `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu` (`mlx[cpu]`) | CPU (containers on macOS cannot reach Metal) |
 | `external` | any server at `soundLab.mlx.url` | wherever it runs |
 
 - **Status bar** (`MLX · n`): server state and loaded models. Click it for start/stop, Studio, models, voice clone and the log.

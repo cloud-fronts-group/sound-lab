@@ -7,7 +7,7 @@
     {
       "name": "sound-lab-studio",
       "source": "./plugins/sound-lab-studio",
-      "description": "FFmpeg skills, dubbing commands (music beds, live streams, video), procedural SFX, Whisper + MP3/MP4 expert agents, safety hooks, and an MCP server for background batch ffmpeg, MLX speech-to-text/TTS/separation (native Apple GPU, mlx[cuda12] or CPU containers, Apple container) and Docker/Podman runners.",
+      "description": "FFmpeg skills, dubbing commands (music beds, live streams, video), procedural SFX, Whisper + MP3/MP4 expert agents, safety hooks, and an MCP server for background batch ffmpeg, MLX speech-to-text/TTS/separation (native Apple GPU, CPU containers, Apple container) and Docker/Podman runners.",
       "category": "media",
       "tags": ["ffmpeg", "audio", "video", "dubbing", "sfx", "whisper", "mlx", "apple-silicon", "mcp"]
     }

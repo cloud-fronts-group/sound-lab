@@ -111,7 +111,8 @@ test/ui/harness.js      Playwright webview check
 - MCP server `mcp/server.js` is plain Node (no deps). Keep it that way so the plugin works straight from a git clone.
 - Every ffmpeg output path goes through `prepareOutputs()`. **ffmpeg 6.x `-n` exits 0 without writing when the output exists**, so never rely on it.
 - `sidechaincompress` ends when its key input ends. `dub.js` pads the key with `apad`, otherwise the music bed is cut at the end of the voice.
-- `mlx[cuda12]` cannot even `import` without the host NVIDIA driver (`libcuda.so.1`). Only the `:cpu` image is import-checked at build time.
+- MLX in containers is CPU-only (`mlx[cpu]`, image tag `:cpu`); there is no NVIDIA/CUDA image. The Apple-GPU path is `mlx_audio.server` running natively on a Mac.
+- `mlx-audio[server]` depends on `webrtcvad`, which has no wheels: the mlx-audio image installs `gcc` for that layer only. whisper.cpp's Vulkan build needs `spirv-headers`, and `GGML_NATIVE=OFF` so the published binary runs on any x86-64/arm64 CPU.
 - Docker Desktop / Apple `container` on macOS have no Metal: MLX there is CPU-only. Native mode is the Apple-GPU path.
 - `aecho` extends output by its longest delay (keyboard-synth adds a 347 ms tail).
 

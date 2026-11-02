@@ -3,7 +3,7 @@
   "name": "sound-lab-studio",
   "displayName": "Sound Lab Studio",
   "version": "0.1.0",
-  "description": "FFmpeg audio/video toolkit for Claude: dubbing (music beds, streams, video), sound-effect design, Whisper/MLX transcription, MP3 & MP4 experts, safety hooks, and an MCP server that runs batch ffmpeg, speech-to-text, TTS and source separation in the background — locally on Apple Silicon (VideoToolbox, MLX), in Docker/Podman/Apple containers, or against an MLX audio service (mlx[cuda12] on NVIDIA).",
+  "description": "FFmpeg audio/video toolkit for Claude: dubbing (music beds, streams, video), sound-effect design, Whisper/MLX transcription, MP3 & MP4 experts, safety hooks, and an MCP server that runs batch ffmpeg, speech-to-text, TTS and source separation in the background — locally on Apple Silicon (VideoToolbox, MLX), in Docker/Podman/Apple containers, or against an MLX audio service.",
   "author": { "name": "Cloud Fronts Group", "url": "https://github.com/cloud-fronts-group" },
   "homepage": "https://github.com/cloud-fronts-group/sound-lab/tree/main/plugins/sound-lab-studio",
   "repository": "https://github.com/cloud-fronts-group/sound-lab",
@@ -30,22 +30,17 @@
     },
     "mlx_mode": {
       "type": "string", "title": "MLX audio service mode",
-      "description": "How the MLX audio inference server (STT/TTS/separation) runs. auto = native on Apple Silicon (Metal GPU), docker elsewhere. docker/podman/apple-container run the Sound Lab mlx-audio image (CPU on macOS; mlx[cuda12] on Linux+NVIDIA). external = use mlx_url.",
+      "description": "How the MLX audio inference server (STT/TTS/separation) runs. auto = native on Apple Silicon (Metal GPU), docker elsewhere. docker/podman/apple-container run the Sound Lab mlx-audio image (mlx[cpu], CPU only). external = use mlx_url.",
       "options": ["auto", "native", "docker", "podman", "apple-container", "external"], "default": "auto"
-    },
-    "mlx_gpu": {
-      "type": "string", "title": "MLX container GPU",
-      "description": "nvidia = use the :cuda12 image (pip mlx[cuda12]) with GPU passthrough. none = :cpu image.",
-      "options": ["none", "nvidia"], "default": "none"
     },
     "mlx_url": {
       "type": "string", "title": "MLX service URL",
-      "description": "Base URL of an already-running mlx-audio server (mode external), e.g. http://gpu-box:8000. Empty = http://127.0.0.1:<port>.", "default": ""
+      "description": "Base URL of an already-running mlx-audio server (mode external), e.g. a Mac running it natively: http://studio-mac.local:8000. Empty = http://127.0.0.1:<port>.", "default": ""
     },
     "mlx_port": { "type": "number", "title": "MLX service port", "description": "Local port the MLX service listens on / is published to.", "default": 8000, "min": 1024, "max": 65535 },
     "mlx_image": {
       "type": "string", "title": "MLX container image",
-      "description": "Image for docker/podman/apple-container modes. Empty = ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:<cpu|cuda12>.", "default": ""
+      "description": "Image for docker/podman/apple-container modes. Empty = ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu.", "default": ""
     },
     "stt_backend": {
       "type": "string", "title": "Speech-to-text backend",
@@ -68,7 +63,6 @@
         "SOUND_LAB_MAX_CONCURRENCY": "${user_config.max_concurrency}",
         "SOUND_LAB_OUTPUT_DIR": "${user_config.output_dir}",
         "SOUND_LAB_MLX_MODE": "${user_config.mlx_mode}",
-        "SOUND_LAB_MLX_GPU": "${user_config.mlx_gpu}",
         "SOUND_LAB_MLX_URL": "${user_config.mlx_url}",
         "SOUND_LAB_MLX_PORT": "${user_config.mlx_port}",
         "SOUND_LAB_MLX_IMAGE": "${user_config.mlx_image}",

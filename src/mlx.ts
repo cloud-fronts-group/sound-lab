@@ -58,11 +58,10 @@ export class MlxController implements vscode.Disposable {
   private configure(): void {
     const c = cfg();
     const port = c.get<number>('mlx.port') || 8000;
-    const gpu = (c.get<string>('mlx.gpu') || 'none') as 'none' | 'nvidia';
     this.client = new MlxAudioClient({
       mode: this.mode, url: c.get<string>('mlx.url') || undefined, port,
-      image: c.get<string>('mlx.image') || `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:${gpu === 'nvidia' ? 'cuda12' : 'cpu'}`,
-      gpu, python: c.get<string>('mlx.python') || 'python3',
+      image: c.get<string>('mlx.image') || 'ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu',
+      python: c.get<string>('mlx.python') || 'python3',
       hfCache: path.join(os.homedir(), '.cache', 'huggingface'), logDir: storageDir('mlx'), voicesDir: this.voicesDir,
     });
     const api = new URL(this.client.url);
@@ -119,7 +118,7 @@ export class MlxController implements vscode.Disposable {
     if ((await this.refresh()).reachable) { vscode.window.showInformationMessage(`mlx-audio server already running at ${this.client.url}`); return; }
     if (this.mode !== 'native' && this.mode !== 'external') {
       const plan = this.client.plan();
-      const go = await vscode.window.showInformationMessage(`Start the mlx-audio server in ${this.mode}?`, { modal: true, detail: `${plan?.cmd} ${plan?.args.join(' ')}\n\nThe first start pulls the image (several GB for :cuda12).` }, 'Start');
+      const go = await vscode.window.showInformationMessage(`Start the mlx-audio server in ${this.mode}?`, { modal: true, detail: `${plan?.cmd} ${plan?.args.join(' ')}\n\nThe first start pulls the image (about 1.5 GB).` }, 'Start');
       if (go !== 'Start') { return; }
     }
     await job(`Starting mlx-audio server (${this.mode})`, async (rep, signal) => { rep(0.05, 'Starting…'); await this.ensure(signal); });

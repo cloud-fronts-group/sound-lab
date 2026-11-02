@@ -6,10 +6,11 @@
 FROM debian:trixie-slim AS build
 ARG WHISPER_CPP_REF=v1.9.5
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git cmake build-essential ca-certificates libvulkan-dev glslc \
+      git cmake build-essential ca-certificates libvulkan-dev glslc spirv-headers \
  && rm -rf /var/lib/apt/lists/*
+# GGML_NATIVE=OFF: the published binary must not be tuned to the CI runner's CPU (illegal instruction elsewhere).
 RUN git clone --depth 1 --branch "${WHISPER_CPP_REF}" https://github.com/ggml-org/whisper.cpp /src \
- && cmake -S /src -B /src/build -DGGML_VULKAN=ON -DWHISPER_BUILD_EXAMPLES=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release \
+ && cmake -S /src -B /src/build -DGGML_VULKAN=ON -DGGML_NATIVE=OFF -DWHISPER_BUILD_EXAMPLES=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release \
  && cmake --build /src/build -j"$(nproc)" --target whisper-cli
 
 FROM debian:trixie-slim

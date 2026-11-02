@@ -12,9 +12,9 @@ description: Use the Apple GPU / media engines for audio-video work on Apple Sil
 | **Docker Desktop** container | ❌ Linux VM with no Metal | Reproducible CPU jobs, Linux parity |
 | **Apple `container`** (macOS 26) | ❌ Linux micro-VM, CPU only | Lightweight CPU containers |
 | **Podman + libkrun** machine | ⚠️ Vulkan only (Venus → MoltenVK → Metal) as `/dev/dri` | whisper.cpp / llama.cpp Vulkan builds. **Not** MLX, not VideoToolbox |
-| **Linux + NVIDIA** container | ✅ CUDA (`--gpus all`) | `mlx[cuda12]` MLX service, NVENC |
+| **Linux + NVIDIA** container | ✅ CUDA (`--gpus all`) | ffmpeg NVENC (`container_gpu: nvidia`). Not MLX: the MLX image is CPU-only |
 
-MLX uses Metal on macOS. On Linux it installs as `mlx[cpu]` or `mlx[cuda12]`, which is why the Sound Lab MLX image comes in `:cpu` and `:cuda12` tags. A Mac gets MLX GPU speed only from a **native** MLX process.
+MLX uses Metal on macOS. The Sound Lab MLX image is `mlx[cpu]` (tag `:cpu`), for Linux servers and isolated containers. MLX gets GPU speed only from a **native** process on Apple Silicon.
 
 ## VideoToolbox / AudioToolbox in ffmpeg
 ```bash
@@ -40,7 +40,7 @@ The MCP `transcribe` tool with `backend: auto` uses the MLX service when it can 
 - Want **GPU speech** on the Mac → native MLX service (`mlx_mode: native`).
 - Want **isolation** and can accept CPU speed → `mlx_mode: docker` or `apple-container` with the `:cpu` image.
 - Want **GPU inside a container** on the Mac → Podman machine with `--provider libkrun`, then the `whisper-vulkan` image with `container_gpu: dri` (whisper.cpp only).
-- Have an **NVIDIA box** → run the `:cuda12` MLX image there and point `mlx_url` at it (`mlx_mode: external`).
+- Working on **Linux** next to a Mac → run the MLX service natively on the Mac and point `mlx_url` at it (`mlx_mode: external`).
 
 ## Check the machine first
 Call the MCP `capabilities` tool. It reports VideoToolbox/AudioToolbox, container runtimes (including the podman provider and Apple `container`), the MLX service state, and recommendations.

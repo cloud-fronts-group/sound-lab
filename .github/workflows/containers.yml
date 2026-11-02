@@ -33,10 +33,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: sound-lab-mlx-audio, tag: cpu,    context: mlx-audio,      args: "MLX_EXTRA=cpu",    platforms: "linux/amd64,linux/arm64" }
-          - { name: sound-lab-mlx-audio, tag: cuda12, context: mlx-audio,      args: "MLX_EXTRA=cuda12", platforms: "linux/amd64" }
-          - { name: sound-lab-ffmpeg,    tag: latest, context: ffmpeg,         args: "",                 platforms: "linux/amd64,linux/arm64" }
-          - { name: sound-lab-whisper-vulkan, tag: latest, context: whisper-vulkan, args: "",           platforms: "linux/amd64,linux/arm64" }
+          # MLX is CPU-only in containers (mlx[cpu]); the Apple GPU path is mlx_audio.server running natively on a Mac.
+          - { name: sound-lab-mlx-audio,      tag: cpu,    context: mlx-audio,      platforms: "linux/amd64,linux/arm64" }
+          - { name: sound-lab-ffmpeg,         tag: latest, context: ffmpeg,         platforms: "linux/amd64,linux/arm64" }
+          - { name: sound-lab-whisper-vulkan, tag: latest, context: whisper-vulkan, platforms: "linux/amd64,linux/arm64" }
     env:
       PUSH: ${{ github.event_name != 'pull_request' }}
     steps:
@@ -53,7 +53,7 @@ jobs:
           image="${IMAGE,,}"
           tags="$image:$VARIANT"
           if [ -n "$VERSION" ]; then
-            # :latest images get a bare :X.Y.Z; variants (cpu, cuda12) get :X.Y.Z-<variant>.
+            # :latest images get a bare :X.Y.Z; variants (cpu) get :X.Y.Z-<variant>.
             if [ "$VARIANT" = latest ]; then tags="$tags,$image:$VERSION"; else tags="$tags,$image:$VERSION-$VARIANT"; fi
           fi
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
@@ -67,7 +67,6 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: plugins/sound-lab-studio/containers/${{ matrix.context }}
-          build-args: ${{ matrix.args }}
           platforms: ${{ matrix.platforms }}
           push: ${{ env.PUSH == 'true' }}
           tags: ${{ steps.tags.outputs.tags }}

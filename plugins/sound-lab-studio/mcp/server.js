@@ -37,14 +37,12 @@ const CFG = {
   },
 };
 const mlxMode = (() => { const m = nonEmpty(env.SOUND_LAB_MLX_MODE, 'auto'); return m === 'auto' ? (appleSilicon ? 'native' : 'docker') : m; })();
-const mlxGpu = nonEmpty(env.SOUND_LAB_MLX_GPU, 'none');
 CFG.mlx = {
   mode: mlxMode,
   autostart: nonEmpty(env.SOUND_LAB_MLX_AUTOSTART, 'true') !== 'false',
   url: nonEmpty(env.SOUND_LAB_MLX_URL, ''),
   port: parseInt(nonEmpty(env.SOUND_LAB_MLX_PORT, '8000'), 10),
-  image: nonEmpty(env.SOUND_LAB_MLX_IMAGE, `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:${mlxGpu === 'nvidia' ? 'cuda12' : 'cpu'}`),
-  gpu: mlxGpu,
+  image: nonEmpty(env.SOUND_LAB_MLX_IMAGE, 'ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu'),
   hfCache: nonEmpty(env.SOUND_LAB_HF_CACHE, path.join(os.homedir(), '.cache', 'huggingface')),
   dataDir: CFG.dataDir,
   sttModel: nonEmpty(env.SOUND_LAB_STT_MODEL, 'mlx-community/whisper-large-v3-turbo'),
@@ -253,7 +251,7 @@ const TOOLS = [
         recs.push('MLX audio service mode "native" runs on the Apple GPU (Metal). Docker and Apple `container` run Linux VMs without Metal, so MLX there is CPU-only.');
         if (ci.podman && ci.podmanProvider !== 'libkrun') { recs.push('For GPU inside containers on macOS use a podman machine with the libkrun provider (Vulkan → Metal) and container_gpu "dri" with the whisper-vulkan image.'); }
       } else if (process.platform === 'linux') {
-        recs.push('Linux: MLX audio service in docker/podman with image tag :cuda12 and mlx_gpu "nvidia" uses `mlx[cuda12]` on NVIDIA GPUs; tag :cpu otherwise.');
+        recs.push('Linux: the MLX audio service runs on the CPU in docker/podman (the :cpu image, `mlx[cpu]`). For the Apple GPU, point mlx_url at a Mac running it natively (mlx_mode "external").');
       }
       if (!c.ffmpeg) { recs.push('Install ffmpeg: brew install ffmpeg (macOS) · apt install ffmpeg (Linux) · winget install ffmpeg (Windows).'); }
       return {
@@ -360,7 +358,7 @@ const TOOLS = [
   },
   {
     name: 'transcribe',
-    description: 'Transcribe audio/video files to SRT/VTT/TXT/JSON in the BACKGROUND. Backends: mlx-service (MLX audio server — native Apple GPU, or a docker/podman/Apple container with mlx[cuda12]/mlx[cpu]), mlx (mlx_whisper CLI), whisper.cpp, openai, ffmpeg (8+). "auto" prefers the MLX service.',
+    description: 'Transcribe audio/video files to SRT/VTT/TXT/JSON in the BACKGROUND. Backends: mlx-service (MLX audio server — native Apple GPU, or a CPU docker/podman/Apple container with mlx[cpu]), mlx (mlx_whisper CLI), whisper.cpp, openai, ffmpeg (8+). "auto" prefers the MLX service.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -440,7 +438,7 @@ const TOOLS = [
   },
   {
     name: 'mlx_service',
-    description: 'Manage the MLX audio inference service (mlx-audio server: STT, TTS, separation). Modes: native (host Python, Apple GPU/Metal), docker | podman (Linux image; :cuda12 uses mlx[cuda12] on NVIDIA, :cpu otherwise), apple-container (Apple `container` CLI, CPU), external (already running at url). Actions: status, start, stop, logs, plan, models.',
+    description: 'Manage the MLX audio inference service (mlx-audio server: STT, TTS, separation). Modes: native (host Python, Apple GPU/Metal), docker | podman (Linux image, mlx[cpu]), apple-container (Apple `container` CLI, CPU), external (already running at url). Actions: status, start, stop, logs, plan, models.',
     inputSchema: {
       type: 'object',
       properties: {

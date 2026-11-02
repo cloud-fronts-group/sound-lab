@@ -4,7 +4,6 @@
 // The fake container CLIs start tests/fixtures/mock-mlx-audio.js (API shape of mlx-audio 0.6.x `mlx_audio.server`).
 // Optional real checks:
 //   SOUND_LAB_TEST_MLX_URL=http://127.0.0.1:8000   → transcribe/TTS against a real running mlx-audio server
-//   SOUND_LAB_TEST_CUDA_PYTHON=/path/venv/bin/python → native start with mlx[cuda12]; on a GPU-less host it must fail fast with the CUDA hint
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -41,10 +40,11 @@ test('normalizeTranscript handles verbose_json, json and ndjson bodies', () => {
   assert.deepEqual(normalizeTranscript(JSON.stringify({ text: 'x', chunks: [{ timestamp: [0.5, 1.5], text: 'x' }] })).segments, [{ start: 0.5, end: 1.5, text: 'x' }]);
 });
 
-test('docker mode: start → plan uses mlx[cuda12] image with --gpus, transcribe/TTS/separate, stop', async () => {
-  const { c, port } = await client('docker', { SOUND_LAB_MLX_GPU: 'nvidia' });
+test('docker mode: start → plan uses the CPU mlx image, transcribe/TTS/separate, stop', async () => {
+  const { c, port } = await client('docker');
   const plan = await c.call('mlx_service', { action: 'plan' });
-  assert.match(plan.command, /run -d --rm --name soundlab-mlx-audio -p 127\.0\.0\.1:\d+:8000 -v .*:\/root\/\.cache\/huggingface --gpus all ghcr\.io\/cloud-fronts-group\/sound-lab-mlx-audio:cuda12$/);
+  assert.match(plan.command, /run -d --rm --name soundlab-mlx-audio -p 127\.0\.0\.1:\d+:8000 -v .*:\/root\/\.cache\/huggingface ghcr\.io\/cloud-fronts-group\/sound-lab-mlx-audio:cpu$/);
+  assert.doesNotMatch(plan.command, /--gpus|nvidia/);
   assert.equal((await c.call('mlx_service', { action: 'status' })).reachable, false);
   const started = await c.call('mlx_service', { action: 'start' });
   assert.equal(started.reachable, true);
@@ -88,8 +88,8 @@ test('docker mode: start → plan uses mlx[cuda12] image with --gpus, transcribe
 });
 
 test('podman and apple-container modes use their CLIs; transcribe auto-starts the service', async () => {
-  const { c: p } = await client('podman', { SOUND_LAB_MLX_GPU: 'nvidia' });
-  assert.match((await p.call('mlx_service', { action: 'plan' })).command, /podman run .* --device nvidia\.com\/gpu=all .*:cuda12$/);
+  const { c: p } = await client('podman');
+  assert.match((await p.call('mlx_service', { action: 'plan' })).command, /podman run -d --rm --name soundlab-mlx-audio .* ghcr\.io\/cloud-fronts-group\/sound-lab-mlx-audio:cpu$/);
   await p.close();
 
   const { c } = await client('apple-container');
@@ -120,14 +120,6 @@ test('external mode never starts anything and explains itself; auto backend skip
   assert.equal(j.backend, 'mlx');
   assert.equal(j.language, 'de');
   assert.match(j.segments[1].text, /whisper-large-v3-turbo/);
-  await c.close();
-});
-
-test('native mode: fails fast with a CUDA hint when mlx[cuda12] has no GPU (real wheel, optional)', { skip: !process.env.SOUND_LAB_TEST_CUDA_PYTHON }, async () => {
-  const { c } = await client('native', { SOUND_LAB_PYTHON: process.env.SOUND_LAB_TEST_CUDA_PYTHON, PATH: '/usr/bin:/bin' });
-  const t0 = Date.now();
-  await assert.rejects(c.call('mlx_service', { action: 'start' }), /libcuda|NVIDIA GPU/);
-  assert.ok(Date.now() - t0 < 60000, 'did not wait for the full timeout');
   await c.close();
 });
 

@@ -3,8 +3,7 @@
 //
 // API server modes:
 //   native           host Python `mlx_audio.server` → MLX on the Apple GPU (Metal). Fastest on Apple Silicon.
-//   docker | podman  Linux image; :cuda12 = pip mlx[cuda12] on NVIDIA (needs --gpus / CDI), :cpu = mlx[cpu].
-//                    Containers on macOS cannot reach Metal, so on a Mac they run on the CPU.
+//   docker | podman  Linux image with mlx[cpu]. Containers on macOS cannot reach Metal, so they run on the CPU.
 //   apple-container  Apple's `container` CLI (macOS 26, Apple silicon): Linux micro-VM, CPU MLX.
 //   external         an already-running server at `url`.
 import * as fs from 'fs';
@@ -21,7 +20,6 @@ export interface MlxConfig {
   url?: string;          // base URL; default http://127.0.0.1:<port>
   port: number;
   image: string;
-  gpu: 'none' | 'nvidia';
   python: string;        // for native mode when `mlx_audio.server` isn't on PATH
   hfCache: string;
   logDir: string;
@@ -194,8 +192,7 @@ export class MlxAudioClient {
           : { cmd: this.cfg.python || 'python3', args: ['-m', 'mlx_audio.server', '--host', '127.0.0.1', '--port', port] };
       }
       case 'docker': case 'podman': {
-        const gpu = this.cfg.gpu === 'nvidia' ? (mode === 'podman' ? ['--device', 'nvidia.com/gpu=all'] : ['--gpus', 'all']) : [];
-        return { cmd: this.bin(mode), args: ['run', '-d', '--rm', '--name', CONTAINER_NAME, '-p', `127.0.0.1:${port}:${CONTAINER_PORT}`, '-v', `${hf}:/root/.cache/huggingface`, ...this.voiceMount(), ...gpu, this.cfg.image] };
+        return { cmd: this.bin(mode), args: ['run', '-d', '--rm', '--name', CONTAINER_NAME, '-p', `127.0.0.1:${port}:${CONTAINER_PORT}`, '-v', `${hf}:/root/.cache/huggingface`, ...this.voiceMount(), this.cfg.image] };
       }
       case 'apple-container':
         return { cmd: this.bin('container'), args: ['run', '-d', '--rm', '--name', CONTAINER_NAME, '-p', `127.0.0.1:${port}:${CONTAINER_PORT}`, '-v', `${hf}:/root/.cache/huggingface`, ...this.voiceMount(), this.cfg.image] };
@@ -247,9 +244,7 @@ export class MlxAudioClient {
       await new Promise(r => setTimeout(r, 1000));
     }
     const logs = this.logs(this.startedMode || this.cfg.mode, 12);
-    const hint = /libcuda\.so|CUDA driver|no CUDA-capable device/i.test(logs)
-      ? ' The :cuda12 image (mlx[cuda12]) needs an NVIDIA GPU and driver on the host. Use the :cpu image, or mode "native" on Apple Silicon.'
-      : /No module named 'uvicorn'|No module named uvicorn/.test(logs) ? ' Install the server extras: pip install "mlx-audio[server]".'
+    const hint = /No module named 'uvicorn'|No module named uvicorn/.test(logs) ? ' Install the server extras: pip install "mlx-audio[server]".'
         : /No module named/.test(logs) ? ' Install mlx-audio: pip install "mlx-audio[server]".' : '';
     throw new Error(`mlx-audio server did not become ready at ${this.url}.${hint}${logs ? `\n${logs}` : ''}`);
   }

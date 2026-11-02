@@ -1,26 +1,15 @@
-# Sound Lab containers. Start the MLX audio service with one of:
-#   docker compose --profile cpu up -d mlx-audio-cpu        # any host (CPU MLX)
-#   docker compose --profile cuda up -d mlx-audio-cuda      # Linux + NVIDIA (mlx[cuda12])
+# Sound Lab containers. Start the MLX audio service (CPU, mlx[cpu]) with:
+#   docker compose --profile cpu up -d mlx-audio-cpu
 # The MCP server finds it at http://127.0.0.1:8000 (setting mlx_mode = external, or docker to let it manage the container).
+# For the Apple GPU, run mlx_audio.server natively on the Mac instead (mlx_mode = native).
 services:
   mlx-audio-cpu:
     profiles: ["cpu"]
-    build: { context: ./mlx-audio, args: { MLX_EXTRA: cpu } }
+    build: ./mlx-audio
     image: ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu
     ports: ["127.0.0.1:8000:8000"]
     volumes: ["${HOME}/.cache/huggingface:/root/.cache/huggingface"]
     restart: unless-stopped
-  mlx-audio-cuda:
-    profiles: ["cuda"]
-    build: { context: ./mlx-audio, args: { MLX_EXTRA: cuda12 } }
-    image: ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cuda12
-    ports: ["127.0.0.1:8000:8000"]
-    volumes: ["${HOME}/.cache/huggingface:/root/.cache/huggingface"]
-    restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
   ffmpeg:
     profiles: ["build"]
     build: ./ffmpeg
