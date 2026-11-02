@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+// Fake mlx_whisper CLI: emits tqdm-style progress and writes <output-dir>/<name>.json like mlx-whisper.
+const fs = require('fs'); const path = require('path');
+const a = process.argv.slice(2); const get = k => a[a.indexOf(k) + 1];
+const input = a[0]; const out = get('--output-dir');
+for (const p of [0, 40, 100]) { process.stderr.write(`${String(p).padStart(3)}%|████| ${p}/100\n`); }
+fs.writeFileSync(path.join(out, path.parse(input).name + '.json'), JSON.stringify({ text: ' MLX whisper text', language: a.includes('--language') ? get('--language') : 'en',
+  segments: [{ start: 0, end: 1.5, text: ' MLX whisper text' }, { start: 1.5, end: 2.0, text: ` model=${get('--model')}` }] }));

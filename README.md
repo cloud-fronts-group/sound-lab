@@ -1,5 +1,12 @@
 # Sound Lab — FFmpeg Audio Toolkit for VS Code
 
+> **Also a Claude Code plugin marketplace.** Install the Sound Lab Studio plugin (FFmpeg dubbing, SFX, Whisper/MLX speech, MP3/MP4 experts, background media MCP server):
+> ```text
+> /plugin marketplace add cloud-fronts-group/sound-lab
+> /plugin install sound-lab-studio@sound-lab
+> ```
+> See [plugins/sound-lab-studio](plugins/sound-lab-studio/README.md).
+
 Sampling, slicing, loudness, effects, spectrograms and speech-to-text, right inside VS Code. Everything runs on your own **FFmpeg** install, and every operation writes a *new* file, so your originals are never overwritten.
 
 ## Requirements

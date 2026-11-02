@@ -1,0 +1,12 @@
+{
+  "name": "sound-lab-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude Code plugin: FFmpeg dubbing, SFX, Whisper/MLX speech, MP3/MP4 experts, background media MCP server.",
+  "license": "GPL-3.0-only",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test --test-timeout=180000 tests/*.test.js",
+    "validate": "claude plugin validate . && claude plugin validate ../.."
+  }
+}

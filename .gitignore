@@ -437,3 +437,5 @@ test/ui/out/
 .DS_Store
 # keep the /release Claude skill (the VS template ignores any "release/" dir)
 !.claude/skills/release/
+# keep the plugin test fixtures (the VS template ignores any "bin/" dir)
+!plugins/sound-lab-studio/tests/fixtures/bin/*

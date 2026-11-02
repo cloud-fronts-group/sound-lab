@@ -14,6 +14,11 @@ node --test --test-name-pattern="slicing" test/*.test.js   # run one test
 
 Use `FFMPEG=/path FFPROBE=/path npm test` to test against a different ffmpeg build.
 
+## Repository layout
+- VS Code extension: `src/`, `media/`, `test/`, `package.json` (everything below until "Claude Code plugin").
+- Claude Code plugin marketplace: `.claude-plugin/marketplace.json` → `plugins/sound-lab-studio/` (skills, agents, hooks, zero-dependency MCP server in `mcp/`, scripts, containers). Tests: `cd plugins/sound-lab-studio && npm test`. Validate: `claude plugin validate plugins/sound-lab-studio && claude plugin validate .`
+- Container images: `plugins/sound-lab-studio/containers/` (built by `.github/workflows/containers.yml` to GHCR).
+
 ## Architecture
 
 ```
@@ -74,3 +79,11 @@ test/ui/harness.js      Playwright webview check
 1. `npm test`. All suites must pass. Add a test in `test/core.test.js` for any new recipe or effect, and assert durations, codecs or levels with ffprobe.
 2. If you touched `media/` or `audioEditor.ts`: run `npm run test:ui` and look at `test/ui/out/editor.png`.
 3. `npm run package` must succeed before you report a change as done.
+
+## Claude Code plugin (plugins/sound-lab-studio)
+- MCP server `mcp/server.js` is plain Node (no deps). Keep it that way so the plugin works straight from a git clone.
+- Every ffmpeg output path goes through `prepareOutputs()`. **ffmpeg 6.x `-n` exits 0 without writing when the output exists**, so never rely on it.
+- `sidechaincompress` ends when its key input ends. `dub.js` pads the key with `apad`, otherwise the music bed is cut at the end of the voice.
+- `mlx[cuda12]` cannot even `import` without the host NVIDIA driver (`libcuda.so.1`). Only the `:cpu` image is import-checked at build time.
+- Docker Desktop / Apple `container` on macOS have no Metal: MLX there is CPU-only. Native mode is the Apple-GPU path.
+- `aecho` extends output by its longest delay (keyboard-synth adds a 347 ms tail).
