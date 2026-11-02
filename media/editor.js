@@ -3,6 +3,7 @@
 (function () {
   // @ts-ignore
   const vscode = acquireVsCodeApi();
+  const ic = (/** @type {string} */ n) => `<svg class="ic" aria-hidden="true" focusable="false"><use href="#sl-${n}"/></svg>`;
   const $ = (/** @type {string} */ id) => /** @type {any} */ (document.getElementById(id));
 
   const canvas = /** @type {HTMLCanvasElement} */ ($('wave'));
@@ -255,8 +256,8 @@
     if (force || !audio.paused) { requestDraw(); }
   }
   (function loop() { if (!audio.paused) { tick(); } requestAnimationFrame(loop); })();
-  audio.addEventListener('play', () => { $('play').textContent = '❚❚'; });
-  audio.addEventListener('pause', () => { $('play').textContent = '▶'; tick(true); });
+  audio.addEventListener('play', () => { $('play').innerHTML = ic('pause'); });
+  audio.addEventListener('pause', () => { $('play').innerHTML = ic('play'); tick(true); });
   audio.addEventListener('ended', () => { if (S.loop) { seek(S.sel ? S.sel.start : 0); audio.play(); } });
   audio.addEventListener('loadedmetadata', () => { if (!S.duration && isFinite(audio.duration)) { S.duration = audio.duration; $('dur').textContent = fmt(S.duration); fit(); } });
   audio.addEventListener('error', () => showError('This audio could not be played in the editor preview (analysis tools still work).'));
@@ -349,7 +350,7 @@
     const body = $('transcriptBody');
     if (!S.transcript || !S.transcript.length) {
       body.classList.add('muted');
-      body.innerHTML = 'No transcript yet. <button class="link" id="tgo">Transcribe now</button>';
+      body.innerHTML = 'No transcript yet. <button class="link" id="tgo">'+ic('transcribe')+'Transcribe now</button>';
       const go = document.getElementById('tgo'); if (go) { go.onclick = () => $('trun').click(); }
       return;
     }
