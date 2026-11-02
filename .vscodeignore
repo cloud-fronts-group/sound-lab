@@ -13,3 +13,5 @@ plugins/**
 .claude-plugin/**
 .github/**
 scripts/**
+dist/**
+Makefile

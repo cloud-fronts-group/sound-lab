@@ -166,6 +166,18 @@ Press F5 in VS Code with this folder open to launch an Extension Development Hos
 ### CI and releases
 GitHub Actions tests every pull request against real ffmpeg on Linux and macOS, runs the webview UI harness and the Claude Code plugin suite, and attaches a VSIX build. To release, add your changes under `## Unreleased` in `CHANGELOG.md`, then run **Actions → Release → Run workflow** and pick `patch`, `minor` or `major`. The workflow bumps the extension and plugin versions together, tags `vX.Y.Z`, and publishes a GitHub release with the VSIX and the plugin zip. It also publishes to the Marketplace and Open VSX (when the `VSCE_PAT` / `OVSX_PAT` secrets are set in the `marketplace` environment) and pushes versioned container images.
 
+### Building and installing with `make`
+```bash
+make                # npm ci → compile → bump the patch version → dist/sound-lab-<version>.vsix
+make install        # install the highest-versioned dist/*.vsix into VS Code (`code` on PATH)
+make all install    # both
+make BUMP=minor     # or major, an explicit X.Y.Z, or none
+make package        # package the current version without bumping
+make download       # the VSIX CI built from the latest green commit on main (gh CLI)
+make help           # every target
+```
+A bump rewrites the version in `package.json`, `package-lock.json` and the plugin manifests together, and dates the CHANGELOG, through `scripts/version.js`. Commit those files to keep the bump. Official, tagged releases come from the **Release** workflow.
+
 ### Working on it with Claude Code
 This repo is set up as a Claude Code project:
 

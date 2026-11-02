@@ -9,6 +9,8 @@ npm run compile      # tsc → out/
 npm test             # compile + node:test suites in test/*.test.js (needs ffmpeg/ffprobe on PATH; ~100 s, studio.test.js is ~70 s of that)
 npm run test:ui      # renders the real editor webview in Chromium with real ffmpeg data, asserts + screenshots → test/ui/out/
 npm run package      # → sound-lab-<version>.vsix
+make                 # npm ci → compile → version bump (BUMP=patch|minor|major|X.Y.Z|none) → dist/sound-lab-<v>.vsix
+make install         # install the highest dist/*.vsix into VS Code (CODE=code-insiders|codium|cursor)
 node --test --test-name-pattern="slicing" test/*.test.js   # run one test
 ```
 

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **Makefile**: `make` installs dependencies, compiles, bumps the version and packages `dist/sound-lab-<version>.vsix`. `make install` installs it into VS Code, and `make download` fetches the VSIX that CI built.
 - **CI/CD**: GitHub Actions CI on every pull request (Linux + macOS, real ffmpeg, webview UI harness, plugin tests and validation), and a one-click Release workflow that versions the extension and plugin together and publishes the VSIX, plugin zip, Marketplace/Open VSX listing and versioned container images.
 - **Sound Lab Studio** (the Studio tab, renamed): Create and DJ ribbons with tool drawers. mlx-audio Studio is embedded in the same tab.
   - Create: Instrumental (9 genres), Beats (7 styles), Chords (roman numerals or names, 8 instruments, 5 rhythms), Sound FX (15, tempo-sized), Auto-tune (YIN + scale snapping + PSOLA, retune speed and amount) and Layer (loop, offset, duck), all sharing one tempo, key and scale.
