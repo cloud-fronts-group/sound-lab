@@ -426,3 +426,14 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+## Sound Lab (VS Code extension)
+node_modules/
+out/
+*.vsix
+test/ui/out/
+.claude/settings.local.json
+.claude/.cache/
+.DS_Store
+# keep the /release Claude skill (the VS template ignores any "release/" dir)
+!.claude/skills/release/
