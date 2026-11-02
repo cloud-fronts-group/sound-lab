@@ -36,6 +36,40 @@ Opening any audio file (wav, mp3, flac, ogg, opus, m4a, aiff, wma, caf…) shows
 
 Keyboard shortcuts: `Space` play/pause · `L` loop · `E` export · `Z` zoom to selection · `0` fit · `+`/`-` zoom · `←`/`→` seek 1 s (5 s with Shift) · `Esc` clear selection.
 
+### mlx-audio: local speech AI inside VS Code
+Sound Lab connects to the **[mlx-audio](https://github.com/Blaizzy/mlx-audio) API server** (`mlx_audio.server`) and can start and stop it for you:
+
+| `soundLab.mlx.mode` | Runs | GPU |
+|---|---|---|
+| `auto` → `native` on Apple Silicon | `python -m mlx_audio.server` on your Mac (`pip install "mlx-audio[server]"`) | **Apple GPU (Metal)** |
+| `docker` / `podman` + `soundLab.mlx.gpu: nvidia` | `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cuda12` (`pip install mlx[cuda12]`) | **NVIDIA CUDA 12** |
+| `docker` / `podman` / `apple-container` | `…:cpu` image (`mlx[cpu]`) | CPU (containers on macOS cannot reach Metal) |
+| `external` | any server at `soundLab.mlx.url` | wherever it runs |
+
+- **Status bar** (`MLX · n`): server state and loaded models. Click it for start/stop, Studio, models, voice clone and the log.
+- **MLX Audio panel** (Sound Lab sidebar):
+  - text-to-speech with voices listed live from the server (Kokoro, Chatterbox, Qwen3-TTS, CSM, Spark…), with inline playback and the result saved to `voice-overs/`;
+  - transcription and source separation;
+  - your cloned voices.
+- **mlx-audio Studio, embedded**: *Sound Lab: Open mlx-audio Studio* opens the mlx-audio web UI in an editor tab, with its pages for text to speech, speech to text and separation.
+  - Studio isn't in the pip wheel, so Sound Lab finds it in an editable install, or downloads `mlx_audio/ui` from GitHub.
+  - It runs `next dev` pointed at the managed API server.
+  - It works over Remote-SSH and Codespaces through VS Code port forwarding.
+- **Transcription backend `mlx-audio`**: MLX Whisper or Parakeet through the same server, including the audio editor's Transcript panel.
+- **Models**: load or unload them from a quick pick, or from the editor context menu (*Text to Speech* on a selection).
+
+### Voice clone
+**Voice clone** (sidebar, audio editor, Studio toolbar, or the command palette) walks you through four steps:
+1. **Set up**: name the voice, choose what you'll make, pick a cloning model (default `mlx-community/chatterbox-turbo-4bit`) and a microphone, and confirm the consent statement. It's stored with the voice.
+2. **Read aloud**: five sentences, four phonetically balanced Harvard sentences plus one in the style of your project. Each take is recorded through ffmpeg and checked for clipping, low level, length and speech. You can retake any of them.
+3. **Your voice**: the takes are trimmed, denoised and loudness-matched into a 24 kHz reference. The reference is transcribed so the cloning model knows the words, and you hear a preview in your cloned voice.
+4. **Create**, in one of three modes:
+   - **Presentation**: transcribe a recorded talk (audio or video) and re-narrate every line in sync, pushing a line later if it would overlap. Videos get a new default narration track, and you also get an SRT. A script file or the active editor works too.
+   - **Audiobook**: chapters come from headings, "Chapter …" lines or `---`. You get one MP3 per chapter at 44.1 kHz / 192 kb/s with peaks ≤ −3 dB and room tone (ACX-style), plus the full book with chapter markers.
+   - **Vocals over an instrumental**: lines placed with `@bar` or `[m:ss]` on the beat grid, with de-ess, compression, tempo-synced echo and an optional double. The instrumental is gently ducked underneath, and you get the mix plus a vocal stem.
+
+Voices live in VS Code's extension storage, and Sound Lab mounts them read-only into container modes, because mlx-audio reads `ref_audio` from the server's own disk. Only clone your own voice, or a voice you have explicit permission to use.
+
 ### Samples view
 The **Sound Lab** activity bar view lists every audio file in the workspace, grouped by folder. Expand a file to see its duration, codec, sample rate, channels, bit depth and tags. Right-click a file for every action.
 

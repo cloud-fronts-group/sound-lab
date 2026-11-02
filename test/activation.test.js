@@ -19,11 +19,14 @@ const vscode = {
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   StatusBarAlignment: { Left: 1, Right: 2 }, ProgressLocation: { Notification: 15 }, ViewColumn: { Beside: -2 },
   ConfigurationTarget: { Global: 1 }, RelativePattern: class {},
+  MarkdownString: class { constructor(v) { this.value = v; } }, QuickPickItemKind: { Separator: -1, Default: 0 },
   window: {
     createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
-    createStatusBarItem: () => ({ show() {}, dispose() {} }),
+    createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
     registerTreeDataProvider: (id, p) => { providers[id] = p; return disposable; },
     registerCustomEditorProvider: (id, p) => { providers[id] = p; return disposable; },
+    registerWebviewViewProvider: (id, p) => { providers[id] = p; return disposable; },
+    state: { focused: false },
     showErrorMessage: async () => undefined, showInformationMessage: async () => undefined,
   },
   commands: { registerCommand: (id, fn) => { registered.set(id, fn); return disposable; }, executeCommand: async () => undefined },
@@ -50,6 +53,7 @@ test('activate registers every contributed command, view and editor', async () =
   assert.ok(!notDeclared.length, `registered in extension.ts but missing from package.json contributes.commands: ${notDeclared.join(', ')}`);
   assert.ok(providers['soundLab.samples'], 'tree provider');
   assert.ok(providers['soundLab.audioPreview'], 'custom editor');
+  assert.ok(providers['soundLab.mlxPanel'], 'MLX Audio webview view');
   assert.equal(pkg.contributes.customEditors[0].viewType, 'soundLab.audioPreview');
   // every command referenced from a menu exists
   const menuCmds = Object.values(pkg.contributes.menus).flat().map(m => m.command).filter(Boolean);
@@ -75,5 +79,12 @@ test('activate registers every contributed command, view and editor', async () =
   const tpl = html.slice(html.indexOf('<body>'));
   for (const [, tag] of tpl.matchAll(/(<button\b[^>]*>[\s\S]*?<\/button>)/g)) { assert.ok(/icon\('[\w-]+'\)/.test(tag), `webview button without icon: ${tag.slice(0, 80)}`); }
   assert.ok(/ic\('transcribe'\)\+'Transcribe now/.test(editorJs), 'Transcribe now button needs its icon');
+  // the MLX panel, Studio panel and Voice Clone wizard follow the same rule
+  for (const [ts, js] of [['mlxPanel.ts', 'mlx-panel.js'], ['studioPanel.ts', 'studio.js'], ['voiceCloneWizard.ts', 'voice-clone.js']]) {
+    const tsSrc = fs.readFileSync(path.join(__dirname, '..', 'src', ts), 'utf8');
+    const jsSrc = fs.readFileSync(path.join(__dirname, '..', 'media', js), 'utf8');
+    for (const [, name] of (tsSrc + jsSrc).matchAll(/(?:icon|ic)\('([\w-]+)'\)/g)) { assert.ok(known.has(name), `${ts}/${js} uses unknown icon '${name}'`); }
+    for (const [, tag] of (tsSrc + jsSrc).matchAll(/(<button\b[^>]*>[\s\S]*?<\/button>)/g)) { assert.ok(/(?:icon|ic)\((?:'[\w-]+'|ic)\)/.test(tag), `${ts}: button without icon: ${tag.slice(0, 90)}`); }
+  }
   await new Promise(r => setTimeout(r, 300)); // let capability detection settle
 });

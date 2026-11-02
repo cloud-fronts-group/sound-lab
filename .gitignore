@@ -439,3 +439,4 @@ test/ui/out/
 !.claude/skills/release/
 # keep the plugin test fixtures (the VS template ignores any "bin/" dir)
 !plugins/sound-lab-studio/tests/fixtures/bin/*
+!test/fixtures/bin/*
