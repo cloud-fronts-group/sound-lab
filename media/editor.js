@@ -307,7 +307,7 @@
     if (name === 'transcript' && !S.transcript) { renderTranscript(); }
   }
   document.querySelectorAll('[data-panel]').forEach(b => b.addEventListener('click', () => openPanel(/** @type {HTMLElement} */ (b).dataset.panel)));
-  document.querySelectorAll('[data-run]').forEach(b => b.addEventListener('click', () => vscode.postMessage({ type: 'run', command: /** @type {HTMLElement} */ (b).dataset.run })));
+  document.querySelectorAll('[data-run]').forEach(b => b.addEventListener('click', () => vscode.postMessage({ type: 'run', command: /** @type {HTMLElement} */ (b).dataset.run, at: audio.currentTime || 0 })));
   $('levelsRefresh').onclick = () => openPanel('levels', true);
   $('trun').onclick = () => { $('transcriptBody').textContent = 'Transcribing…'; vscode.postMessage({ type: 'transcribe' }); };
   $('tcopy').onclick = () => S.transcript && vscode.postMessage({ type: 'copy', text: S.transcript.map(s => s.text).join('\n') });
