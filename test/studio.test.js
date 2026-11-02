@@ -207,6 +207,8 @@ test('DJ: backspin, echo out and beat jump land on the beat with the right lengt
 
   const bj = D.beatJump(house, { at: 7.8, beats: 8 });
   assert.ok(within(bj.buf.length / 48000, g.duration - 8 * beat, 0.001), 'jump +8 beats shortens by 8 beats');
+  const toZero = D.beatJump(house, { at: 4 * beat, beats: -4 });   // lands exactly on sample 0
+  assert.ok(toZero.buf.L.every(Number.isFinite) && Number.isFinite(toZero.buf.peak()), 'a jump back to 0:00 writes no NaN samples');
   const back = D.beatJump(house, { at: 7.8, beats: -4 });
   assert.ok(within(back.buf.length / 48000, g.duration + 4 * beat, 0.001), 'jump −4 beats repeats 4 beats');
 });
@@ -225,6 +227,11 @@ test('DJ: quick mix and long blend tempo-match and phase-align B', async () => {
   // after the mix point only B is left: B's beat grid continues A's
   const after = BG.detectBeatGrid(await IO.decode(FF, f('quick.wav')), 124);
   assert.ok(after.beats.some(t => within(t, q.at, 0.012)), 'the mixed result keeps one continuous beat grid through the transition');
+  // a 1-bar quick mix still swaps the bass halfway: just before the end of the bar only B's lows remain
+  const lowOnlyB = D.transition({ ...house, buf: (() => { const b = house.buf; const z = new (require(path.join(ROOT, 'synth')).Stereo)(b.length); z.L.set(b.L); z.R.set(b.R); return z; })() }, { ...pop, buf: new (require(path.join(ROOT, 'synth')).Stereo)(pop.buf.length) }, { style: 'quick', at: 15.5 });
+  const i = Math.round((lowOnlyB.end - 0.05) * 48000);
+  let e = 0; for (let k = i - 2000; k < i; k++) { e += lowOnlyB.buf.L[k] ** 2; }
+  assert.ok(e < 1e-3 * 2000, `A's bass is gone in the second half of a 1-bar mix (energy ${e.toFixed(4)})`);
   const l = D.transition(house, pop, { style: 'long', at: 0, bars: 8 });
   assert.ok(within(l.end - l.at, 8 * bar, 1e-6), 'long blend = 8 bars');
 });

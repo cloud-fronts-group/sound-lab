@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { MlxController } from './mlx';
-import { cfg, tools, job, outputFor, uniquePath, defaultEncode, sameFormatEncode, announce, resolveTargets, state, Reporter } from './util';
+import { cfg, tools, job, outputFor, uniquePath, defaultEncode, sameFormatEncode, announce, resolveTargets, state, Reporter, summaryOf } from './util';
 import { codecArgs, formatFromPath, Format } from './core/recipes';
 import * as C from './core/composer';
 import { renderSfx, SFX } from './core/sfx';
@@ -37,12 +37,15 @@ export class StudioTools {
   constructor(private mlx: MlxController) {}
 
   // ------------------------------------------------------------ paths & formats
-  /** Where newly created material goes: soundLab.studio.outputDirectory, else <workspace>/sound-lab-studio, else ~/Sound Lab/Studio. */
-  outDir(kind: string): string {
+  /** Base folder for new material (not created): soundLab.studio.outputDirectory, else <workspace>/sound-lab-studio, else ~/Sound Lab/Studio. */
+  outBase(): string {
     const custom = cfg().get<string>('studio.outputDirectory') || '';
     const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const base = custom ? (path.isAbsolute(custom) ? custom : path.join(ws ?? os.homedir(), custom)) : ws ? path.join(ws, 'sound-lab-studio') : path.join(os.homedir(), 'Sound Lab', 'Studio');
-    const d = path.join(base, kind);
+    return custom ? (path.isAbsolute(custom) ? custom : path.join(ws ?? os.homedir(), custom)) : ws ? path.join(ws, 'sound-lab-studio') : path.join(os.homedir(), 'Sound Lab', 'Studio');
+  }
+  /** <outBase>/<kind>, created on demand. */
+  outDir(kind: string): string {
+    const d = path.join(this.outBase(), kind);
     fs.mkdirSync(d, { recursive: true });
     return d;
   }
@@ -52,8 +55,8 @@ export class StudioTools {
     return { file: uniquePath(path.join(this.outDir(kind), `${name}.${ext}`)), codec: codecArgs({ ...enc, sampleRate: enc.format === 'opus' ? 48000 : enc.sampleRate }) };
   }
   /** Edits of an existing track keep its format and bit depth (at 48 kHz, the DJ engine's rate). */
-  private editFile(src: string, suffix: string): { file: string; codec: string[] } {
-    const enc = sameFormatEncode(src);
+  private async editFile(src: string, suffix: string): Promise<{ file: string; codec: string[] }> {
+    const enc = sameFormatEncode(src, await summaryOf(src).catch(() => undefined));
     const f: Format = formatFromPath(src) ?? enc.format;
     const ext = f === 'aiff' ? 'aif' : f;
     return { file: outputFor(src, suffix, ext), codec: codecArgs({ ...enc, format: f, sampleRate: undefined }) };
@@ -67,7 +70,8 @@ export class StudioTools {
     if (!a) {
       a = await D.analyse(tools(), file, { bpm, key: true, signal });
       this.cache.set(key, a);
-      while (this.cache.size > 3) { this.cache.delete(this.cache.keys().next().value as string); }
+      for (const k of [...this.cache.keys()]) { if (k !== key && k.startsWith(`${file}|`)) { this.cache.delete(k); } }   // one entry per file
+      while (this.cache.size > 2) { this.cache.delete(this.cache.keys().next().value as string); }
     }
     return a;
   }
@@ -79,7 +83,7 @@ export class StudioTools {
   // ------------------------------------------------------------ run a tool with drawer parameters
   async run(tool: Tool, p: P, report: Reporter, signal: AbortSignal): Promise<ToolResult> {
     const t = tools();
-    const groove = { bpm: num(p.bpm, 100)!, key: str(p.key, 'C'), scale: str(p.scale, 'minor'), bars: Math.max(1, Math.min(128, num(p.bars, 8)!)), seed: num(p.seed, 1) };
+    const groove = { bpm: Math.max(40, Math.min(220, num(p.bpm, 100) || 100)), key: str(p.key, 'C'), scale: str(p.scale, 'minor'), bars: Math.max(1, Math.min(128, num(p.bars, 8)!)), seed: num(p.seed, 1) };
     const tag = `${groove.bpm}bpm-${groove.key.replace('#', 's')}${groove.scale === 'minor' ? 'm' : groove.scale === 'major' ? '' : '-' + groove.scale}`;
     switch (tool) {
       case 'instrumental': {
@@ -113,14 +117,14 @@ export class StudioTools {
         const src = this.need(p.track, 'Choose a vocal track to auto-tune.');
         let key = str(p.key, ''), scale = str(p.scale, '');
         if (!key || p.detectKey === true) { report(0.05, 'Detecting key…'); const k = detectKey(await decode(t.ffmpeg, src, { signal })); key = k.key; scale = k.scale; }
-        const { file, codec } = this.editFile(src, 'autotuned');
+        const { file, codec } = await this.editFile(src, 'autotuned');
         const r = await autoTune(t, src, file, { key, scale: scale || 'major', retuneMs: num(p.retune, 40), amount: (num(p.amount, 100)!) / 100, codec, signal, onProgress: report });
         return { tool, file, seconds: await durationOf(t.ffprobe, file), detail: r.detail };
       }
       case 'layer': {
         const target = this.need(p.target, 'Choose the track to layer onto.');
         const part = this.need(p.part, 'Generate or choose a part to layer first.');
-        const { file, codec } = this.editFile(target, `with-${path.parse(part).name}`.slice(0, 60));
+        const { file, codec } = await this.editFile(target, `with-${path.parse(part).name}`.slice(0, 60));
         report(0.3, 'Layering…');
         const r = await C.layerOnto(t, target, part, file, { loop: p.loop !== false, duck: p.duck === true, gainDb: num(p.gain, 0), offset: num(p.offset, 0), codec, signal });
         return { tool, file, seconds: r.seconds, detail: r.detail };
@@ -143,7 +147,7 @@ export class StudioTools {
     const A = ['acapella', 'novocals'].includes(tool) ? undefined : await this.analysed(a, bpmA, signal);
     const label = DJ_LABELS[tool];
     const save = async (buf: Parameters<typeof D.saveEdit>[1], suffix: string, lufs?: number): Promise<{ file: string; seconds: number }> => {
-      const { file, codec } = this.editFile(a, suffix);
+      const { file, codec } = await this.editFile(a, suffix);
       report(0.85, 'Encoding…');
       await D.saveEdit(t, buf, file, { codec, signal, lufs });
       return { file, seconds: buf.length / 48000 };
@@ -188,7 +192,7 @@ export class StudioTools {
   async separate(src: string, report: Reporter, signal: AbortSignal): Promise<{ acapella: string; instrumental: string; engine: string }> {
     const t = tools();
     const mode = cfg().get<string>('dj.separation') || 'auto';
-    const acap = this.editFile(src, 'acapella'), inst = this.editFile(src, 'instrumental');
+    const acap = await this.editFile(src, 'acapella'), inst = await this.editFile(src, 'instrumental');
     const up = mode !== 'center' && (await this.mlx.client.health()).reachable;
     if (mode === 'mlx' || up) {
       report(0.15, 'Separating vocals with mlx-audio…');
@@ -215,21 +219,27 @@ export class StudioTools {
     const t = tools();
     // A provides the vocals, B the instrumental (either may already be a stem)
     report(0.2, 'Preparing the instrumental…');
-    const instFile = p.bIsInstrumental === true ? bFile : (await this.separate(bFile, (f, m) => report(0.2 + f * 0.25, m), signal)).instrumental;
-    const vocFile = p.aIsAcapella === true ? A.file : (await this.separate(A.file, (f, m) => report(0.45 + f * 0.25, m), signal)).acapella;
+    const stems: string[] = [];
+    const sepB = p.bIsInstrumental === true ? undefined : await this.separate(bFile, (f, m) => report(0.2 + f * 0.25, m), signal);
+    const sepA = p.aIsAcapella === true ? undefined : await this.separate(A.file, (f, m) => report(0.45 + f * 0.25, m), signal);
+    if (sepB) { stems.push(sepB.instrumental, sepB.acapella); }
+    if (sepA) { stems.push(sepA.acapella, sepA.instrumental); }
+    const instFile = sepB ? sepB.instrumental : bFile;
+    const vocFile = sepA ? sepA.acapella : A.file;
     const inst = await this.analysed(bFile, num(p.bpmB), signal);
     const instA: D.Analysed = { ...inst, file: instFile, buf: instFile === bFile ? inst.buf : await decode(t.ffmpeg, instFile, { signal }) };
     let semis = num(p.semitones, 0)!;
     if (p.keyMatch === true && A.key && inst.key) { semis = D.keyShift(A.key, inst.key); }
     report(0.75, `Matching vocals to ${inst.grid.bpm} BPM${semis ? `, ${semis > 0 ? '+' : ''}${semis} st` : ''}…`);
-    const voc = await D.analyseMatched(t, vocFile, inst.grid.bpm, { bpm: A.grid.bpm, semitones: semis, signal });
+    const voc = await D.analyseMatched(t, vocFile, inst.grid.bpm, { srcGrid: A.grid, semitones: semis, signal });
     // the acapella shares the original song's grid (detected on the full mix, where the beat is)
     voc.grid = D.rescaleGrid(A.grid, voc.ratio, inst.grid.bpm, voc.buf.length / 48000);
     const r = D.mashup(voc, instA, { offsetBars: num(p.offsetBars, 0), vocalGainDb: num(p.vocalGain, 0) });
-    const { file, codec } = this.editFile(A.file, `mashup-${path.parse(bFile).name}`.slice(0, 60));
+    const { file, codec } = await this.editFile(A.file, `mashup-${path.parse(bFile).name}`.slice(0, 60));
     report(0.9, 'Mastering…');
     await D.saveEdit(t, r.buf, file, { codec, signal, lufs: -14 });
-    return { tool: 'mashup', file, seconds: r.buf.length / 48000, detail: r.detail + (semis ? ` · vocals ${semis > 0 ? '+' : ''}${semis} st` : '') };
+    // the stems made on the way are real files next to the sources: list them so they are announced, not left silently
+    return { tool: 'mashup', file, files: [file, ...stems], seconds: r.buf.length / 48000, detail: r.detail + (semis ? ` · vocals ${semis > 0 ? '+' : ''}${semis} st` : '') };
   }
 
   // ------------------------------------------------------------ one-click commands (palette, explorer, editor)
@@ -246,6 +256,7 @@ export class StudioTools {
     const files = await resolveTargets(arg, Array.isArray(args) ? args : undefined, { many: two, title: tool === 'mashup' ? 'Vocals from' : DJ_LABELS[tool] });
     if (!files.length) { return; }
     const p: P = { track: files[0].fsPath, ...extra };
+    if (tool === 'doubledrop' && extra.at !== undefined) { p.dropA = extra.at; }   // the editor's playhead marks A's drop
     if (two) {
       let b = files[1];
       if (!b) {
@@ -279,7 +290,7 @@ export class StudioTools {
   async cmdDetect(arg?: unknown, args?: unknown): Promise<void> {
     const [u] = await resolveTargets(arg, args, { title: 'Detect tempo & key' });
     if (!u) { return; }
-    const a = await job(`Detecting tempo & key · ${path.basename(u.fsPath)}`, async () => this.analyse(u.fsPath));
+    const a = await job(`Detecting tempo & key · ${path.basename(u.fsPath)}`, async () => this.analyse(u.fsPath));  // (analysis is in-memory; the job shows progress)
     if (!a) { return; }
     state.output.appendLine(`${path.basename(u.fsPath)}: ${a.bpm} BPM, ${a.key} ${a.scale} (${a.camelot}), first downbeat ${formatTimecode(a.downbeat)}`);
     const pick = await vscode.window.showInformationMessage(`${path.basename(u.fsPath)}: ${a.bpm} BPM · ${a.key} ${a.scale} (${a.camelot})`, 'Copy');

@@ -42,12 +42,14 @@ export class StudioPanel {
   private tool = '';
   private track = '';
   private constructor(private panel: vscode.WebviewPanel, private ctl: MlxController, private tools: StudioTools, private media: vscode.Uri) {
-    panel.onDidDispose(() => { StudioPanel.current = undefined; });
+    panel.onDidDispose(() => { StudioPanel.current = undefined; fs.rmSync(StudioPanel.previewDir, { recursive: true, force: true }); });
     panel.webview.onDidReceiveMessage(m => this.onMessage(m).catch(e => this.post({ type: 'error', tool: m.tool, message: (e as Error).message.split('\n')[0] })));
   }
 
+  static readonly previewDir = path.join(os.tmpdir(), 'soundlab-preview');
+  /** Only what results can live in: the media folder, workspace folders, the Studio output folder and the preview copy folder. */
   static roots(media: vscode.Uri, tools: StudioTools): vscode.Uri[] {
-    return [media, ...(vscode.workspace.workspaceFolders || []).map(f => f.uri), vscode.Uri.file(os.tmpdir()), vscode.Uri.file(path.dirname(tools.outDir('.')))];
+    return [media, ...(vscode.workspace.workspaceFolders || []).map(f => f.uri), vscode.Uri.file(StudioPanel.previewDir), vscode.Uri.file(tools.outBase())];
   }
 
   /** Open (or reveal) the Studio tab. `tool` opens that drawer; `track` pre-fills its track; `startStudio` boots mlx-audio Studio. */
@@ -75,7 +77,7 @@ export class StudioPanel {
     let f = file;
     if (!roots.some(r => file.startsWith(r))) {
       // outside the webview's resource roots (e.g. an edit next to a source elsewhere): preview a temp copy
-      const d = path.join(os.tmpdir(), 'soundlab-preview'); fs.mkdirSync(d, { recursive: true });
+      const d = StudioPanel.previewDir; fs.mkdirSync(d, { recursive: true });
       f = path.join(d, crypto.createHash('sha1').update(file).digest('hex').slice(0, 10) + path.extname(file));
       fs.copyFileSync(file, f);
     }
@@ -93,14 +95,14 @@ export class StudioPanel {
       case 'pick': {
         const picked = await vscode.window.showOpenDialog({ openLabel: 'Choose', canSelectMany: false, defaultUri: state.activeEditorUri,
           filters: { Audio: ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'aif', 'aiff', 'caf', 'webm', 'mka', 'mp4', 'mov'], 'All files': ['*'] } });
-        if (picked?.[0]) { this.post({ type: 'picked', field: m.field, file: picked[0].fsPath, name: path.basename(picked[0].fsPath) }); }
+        if (picked?.[0]) { this.post({ type: 'picked', tool: m.tool, field: m.field, file: picked[0].fsPath, name: path.basename(picked[0].fsPath) }); }
         break;
       }
       case 'analyse': {
         if (!m.file) { break; }
-        this.post({ type: 'analysing', field: m.field });
-        try { const a = await this.tools.analyse(m.file, m.bpm || undefined); this.post({ type: 'analysed', field: m.field, ...a }); }
-        catch (e) { this.post({ type: 'analysed', field: m.field, error: (e as Error).message.split('\n')[0] }); }
+        this.post({ type: 'analysing', tool: m.tool, field: m.field });
+        try { const a = await this.tools.analyse(m.file, m.bpm || undefined); this.post({ type: 'analysed', tool: m.tool, field: m.field, ...a }); }
+        catch (e) { this.post({ type: 'analysed', tool: m.tool, field: m.field, file: m.file, error: (e as Error).message.split('\n')[0] }); }
         break;
       }
       case 'generate': {
@@ -125,7 +127,7 @@ export class StudioPanel {
       case 'reveal': if (m.file) { await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(m.file)); } break;
       case 'active': {
         const u = state.activeEditorUri;
-        if (u) { this.post({ type: 'picked', field: m.field, file: u.fsPath, name: path.basename(u.fsPath) }); }
+        if (u) { this.post({ type: 'picked', tool: m.tool, field: m.field, file: u.fsPath, name: path.basename(u.fsPath) }); }
         else { this.post({ type: 'error', tool: m.tool, message: 'No audio file is open in the Sound Lab editor.' }); }
         break;
       }
@@ -144,6 +146,7 @@ export class StudioPanel {
   }
 
   private async render(pagePath = '', tryStart = false): Promise<void> {
+    const track = this.track;
     let url: string | undefined;
     if (await this.ctl.studio.reachable()) { url = this.ctl.studio.url; }
     else if (tryStart) { url = await this.ctl.ensureStudio(); }
@@ -180,7 +183,10 @@ export class StudioPanel {
         <aside id="drawer" class="drawer" hidden></aside>
         <div class="stage">${stage}</div>
       </div>
-      <div id="data" hidden data-json="${esc(this.data())}" data-tool="${esc(this.tool)}" data-track="${esc(this.track)}"></div>`;
+      <div id="data" hidden data-json="${esc(this.data())}" data-tool="${esc(this.tool)}" data-track="${esc(track)}"></div>`;
+    // roots follow the current workspace / output setting; the initial track applies to the first paint only
+    this.panel.webview.options = { enableScripts: true, localResourceRoots: StudioPanel.roots(this.media, this.tools) };
+    this.track = '';
     this.panel.webview.html = page({ webview: this.panel.webview, media: this.media, title: 'Sound Lab Studio', body, script: 'studio.js', css: ['studio.css'], frameSrc: origin ? [origin] : [] });
   }
 }
