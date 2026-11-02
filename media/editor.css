@@ -119,3 +119,4 @@ th { color: var(--muted); font-weight: normal; }
   background: var(--vscode-notifications-background); color: var(--vscode-notifications-foreground);
   border: 1px solid var(--vscode-notifications-border, var(--border)); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
+.mt12 { margin-top: 12px; }

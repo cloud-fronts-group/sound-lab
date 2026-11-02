@@ -99,11 +99,11 @@ const MODES = {
     const aac = ['-c:a', 'aac', '-b:a', o['audio-bitrate'] || '192k'];
     const args = ['-hide_banner', '-y', ...inputs, '-filter_complex', graph, '-map', '0:v?', '-c:v', 'copy'];
     if (mode === 'replace') {
-      args.push('-map', '[dub]', ...aac, '-metadata:s:a:0', `language=${lang}`, '-metadata:s:a:0', `title=${title}`);
+      args.push('-map', '[dub]', ...aac, '-metadata:s:a:0', `language=${lang}`, '-metadata:s:a:0', `title=${title}`, '-metadata:s:a:0', `handler_name=${title}`);
     } else {
       // keep the original audio as track 0, add the dub as track 1 and make it the default
       args.push('-map', '0:a:0', '-map', '[dub]', '-c:a:0', 'copy', '-c:a:1', 'aac', '-b:a:1', o['audio-bitrate'] || '192k',
-        '-metadata:s:a:1', `language=${lang}`, '-metadata:s:a:1', `title=${title}`, '-disposition:a:0', '0', '-disposition:a:1', 'default');
+        '-metadata:s:a:1', `language=${lang}`, '-metadata:s:a:1', `title=${title}`, '-metadata:s:a:1', `handler_name=${title}`, '-disposition:a:0', '0', '-disposition:a:1', 'default');
     }
     args.push('-map', '0:s?', '-c:s', container === 'mp4' || container === 'mov' || container === 'm4v' ? 'mov_text' : 'copy');
     if (['mp4', 'mov', 'm4v'].includes(container)) { args.push('-movflags', '+faststart'); }

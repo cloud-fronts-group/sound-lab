@@ -207,6 +207,8 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
     <button data-run="convert">${icon('convert')}Convert…</button>
     <button data-run="sliceEqual">${icon('slice-equal')}Slice…</button>
     <button data-run="splitOnSilence">${icon('split-silence')}Split on silence…</button>
+    <button data-run="mlxSeparate" title="Split into a sound (e.g. speech) and the rest with mlx-audio">${icon('separate')}Separate…</button>
+    <button data-run="voiceClone" title="Record your voice and narrate with it">${icon('voice-clone')}Voice clone</button>
     <button data-run="probe">${icon('info')}Info</button>
   </div>
 
