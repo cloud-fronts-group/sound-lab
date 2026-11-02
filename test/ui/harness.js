@@ -163,6 +163,12 @@ const check = (cond, msg) => { console.log(`${cond ? '✔' : '✖'} ${msg}`); if
     await page.click('[data-run="applyEffects"]');
     check((await page.evaluate(() => window.__posted)).some(m => m.type === 'run' && m.command === 'applyEffects'), `${tag} Effects… button posts run/applyEffects`);
 
+    await page.evaluate(() => { const a = document.getElementById('audio'); a.currentTime = 3.5; });
+    await page.click('[data-run="djBackspin"]');
+    const dj = (await page.evaluate(() => window.__posted)).find(m => m.type === 'run' && m.command === 'djBackspin');
+    check(dj && Math.abs(dj.at - 3.5) < 0.05, `${tag} DJ Backspin posts the playhead time (at=${dj && dj.at})`);
+    check((await page.locator('.actions.dj button').count()) === 12, `${tag} DJ row: 9 moves + auto-tune, tempo & key, Studio`);
+
     check(errors.length === 0, `${tag} no page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
     await page.close();
   }

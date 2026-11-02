@@ -6,7 +6,7 @@ This TypeScript VS Code extension covers sound sampling, editing, analysis and s
 
 ```bash
 npm run compile      # tsc → out/
-npm test             # compile + node:test suites in test/*.test.js (needs ffmpeg/ffprobe on PATH; ~20 s)
+npm test             # compile + node:test suites in test/*.test.js (needs ffmpeg/ffprobe on PATH; ~100 s, studio.test.js is ~70 s of that)
 npm run test:ui      # renders the real editor webview in Chromium with real ffmpeg data, asserts + screenshots → test/ui/out/
 npm run package      # → sound-lab-<version>.vsix
 node --test --test-name-pattern="slicing" test/*.test.js   # run one test
@@ -42,15 +42,24 @@ src/
   sampleExplorer.ts Tree view `soundLab.samples`
   mlx.ts           MlxController: settings → MlxAudioClient/StudioManager, status bar, MLX commands
   mlxPanel.ts      Sidebar webview view `soundLab.mlxPanel` (TTS, STT, separation, voices)
-  studioPanel.ts   mlx-audio Studio embedded (iframe) in an editor tab
+  studioPanel.ts   "Sound Lab Studio" tab: Create + DJ ribbons, drawers (media/studio.js), embedded mlx-audio Studio iframe
   voiceCloneWizard.ts  Voice Clone wizard webview (record → build → create)
   core/mlxAudio.ts     mlx-audio HTTP client + server/Studio lifecycle (no vscode)
   core/voiceClone.ts   prompts, take checks, reference, profiles, audiobook/presentation/vocals renderers (no vscode)
+  core/theory.ts       keys, scales, chord symbols (roman numerals + names), progressions, voicing, snapMidi
+  core/synth.ts        Stereo buffers (wrap = seamless loops), instruments, drum voices, SVF filter, float WAV writer
+  core/composer.ts     beats / chords / instrumentals (genres) + layerOnto(); core/sfx.ts lavfi effect recipes
+  core/audioio.ts      decode → Stereo (f32 pipe), master() (reverb, glue, LUFS, limiter; loops rendered twice), encode()
+  core/autotune.ts     YIN tracker, correction curve (hysteresis, retune ms, amount), TD-PSOLA shifter
+  core/beatgrid.ts     onset novelty, tempo (+ candidates × prior), downbeats (chroma flux), drop + key detection
+  core/dj.ts           backspin, echo out, beat jump, transition (quick/long), double drop, centerSplit, mashup
+  studioTools.ts       VS Code glue for all Studio tools: output paths/formats, jobs, one-click DJ/auto-tune commands
   extension.ts     activate(): registers the command map, views, editor, status bar
 media/editor.js    webview script (plain JS, // @ts-check). It talks to audioEditor.ts via postMessage.
 media/editor.css   webview styles. Use VS Code theme variables only, so it works in light and dark themes.
 test/core.test.js       integration tests against real ffmpeg
 test/activation.test.js mocks `vscode`, activates, and checks that the manifest and the code agree (commands, menus, settings, webview buttons)
+test/studio.test.js     theory, composer, SFX, auto-tune (pitch in cents), beat grid and every DJ move against real ffmpeg (~70 s)
 test/ui/harness.js      Playwright webview check
 ```
 
@@ -105,3 +114,13 @@ test/ui/harness.js      Playwright webview check
 - `mlx[cuda12]` cannot even `import` without the host NVIDIA driver (`libcuda.so.1`). Only the `:cpu` image is import-checked at build time.
 - Docker Desktop / Apple `container` on macOS have no Metal: MLX there is CPU-only. Native mode is the Apple-GPU path.
 - `aecho` extends output by its longest delay (keyboard-synth adds a 347 ms tail).
+
+## Studio tools (Create + DJ) gotchas
+- Loops (`Stereo(…, wrap=true)`) wrap note tails to the start, and `master()` renders them twice with `-stream_loop 1` and keeps the second copy. That keeps reverb, compressor and limiter state seamless and the length sample-exact. Don't add filters after the `atrim`.
+- `alimiter` needs `latency=1`, or it delays the signal by its attack. The ceiling is 0.79 (−2 dBFS sample peak), because drum transients overshoot about 1.4 dB between samples.
+- Tempo has an inherent half/double ambiguity. Detection scores candidates (×2, ×½, ×3/2, ×2/3) by a kick+snare comb times a prior around 115 BPM. Tests accept ±octave, and the UI offers ×2 / ÷2. Pass a BPM hint to `detectBeatGrid` for an exact refinement.
+- Downbeats come from chroma flux across each beat (harmony changes on bar lines), then kick strength, then snare backbeat. Four-on-the-floor alone can't tell beat 1 from beat 3.
+- Preset progressions are written for major or minor. In the other mode they play in the relative key (`pop` in A minor → C G Am F), so chords stay diatonic to what auto-tune and the bass use.
+- Auto-tune uses PSOLA, not a delay-line shifter. A doppler/two-tap shifter comb-filters even at ratio 1. PSOLA with synthesis marks equal to analysis marks reconstructs the input (amount 0 → SNR > 40 dB). YIN runs on audio decimated to about 24 kHz for speed.
+- `atempo` is used to tempo-match (pitch preserved). Key shift = `asetrate`·`aresample`·`atempo(1/p)`. `rescaleGrid()` re-lays the grid at the target tempo, so a folded half-time track gets bars of the right length.
+- Center-channel separation needs stereo. Mono or L=R input throws and suggests mlx-audio. mlx-audio separation is asked for `description: 'vocals'`: target = acapella, residual = instrumental.
