@@ -117,7 +117,7 @@ export async function extractPeaks(ffmpeg: string, input: string, duration: numb
   const perBucket = Math.max(1, Math.round(rate / bps));
   const data: number[] = [];
   let min = 1, max = -1, n = 0, sumSq = 0, total = 0;
-  let leftover = Buffer.alloc(0);
+  let leftover: Buffer = Buffer.alloc(0);
 
   const r = await run({
     exe: ffmpeg, args: pcmForPeaks(input, rate), signal,

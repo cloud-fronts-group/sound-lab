@@ -8,5 +8,13 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: monthly }
+    ignore:
+      # Must equal engines.vscode (vsce refuses a newer @types/vscode). Bump both together, by hand.
+      - dependency-name: "@types/vscode"
+      # Tracks the Node that the oldest supported VS Code ships, not the newest Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
-      dev-dependencies: { dependency-type: development }
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
