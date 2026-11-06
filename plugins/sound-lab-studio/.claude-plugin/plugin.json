@@ -33,6 +33,11 @@
       "description": "How the MLX audio inference server (STT/TTS/separation) runs. auto = native on Apple Silicon (Metal GPU), docker elsewhere. docker/podman/apple-container run the Sound Lab mlx-audio image (CPU on macOS; mlx[cuda12] on Linux+NVIDIA). external = use mlx_url.",
       "options": ["auto", "native", "docker", "podman", "apple-container", "external"], "default": "auto"
     },
+    "mlx_server": {
+      "type": "string", "title": "mlx_audio.server path (native mode)",
+      "description": "Path to mlx_audio.server for native mode. Empty = find it on PATH, then in Homebrew's bin (/opt/homebrew/bin, /usr/local/bin — where brew install cloud-fronts-group/sound-lab/mlx-audio puts it) and ~/.local/bin; when nothing is found, python3 -m mlx_audio.server is used.",
+      "default": ""
+    },
     "mlx_gpu": {
       "type": "string", "title": "MLX container GPU",
       "description": "nvidia = use the :cuda12 image (pip mlx[cuda12]) with GPU passthrough. none = :cpu image.",
@@ -68,6 +73,7 @@
         "SOUND_LAB_MAX_CONCURRENCY": "${user_config.max_concurrency}",
         "SOUND_LAB_OUTPUT_DIR": "${user_config.output_dir}",
         "SOUND_LAB_MLX_MODE": "${user_config.mlx_mode}",
+        "SOUND_LAB_MLX_SERVER": "${user_config.mlx_server}",
         "SOUND_LAB_MLX_GPU": "${user_config.mlx_gpu}",
         "SOUND_LAB_MLX_URL": "${user_config.mlx_url}",
         "SOUND_LAB_MLX_PORT": "${user_config.mlx_port}",

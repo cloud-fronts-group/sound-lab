@@ -12,6 +12,10 @@
   - MLX Audio sidebar panel (TTS with live voice lists, transcription, separation, models).
   - `mlx-audio` transcription backend.
   - mlx-audio Studio embedded in an editor tab (downloaded and started on demand, remote-friendly).
+- **Homebrew (Apple Silicon)**: this repository is a Homebrew tap. `Formula/` holds `mlx-audio` (`mlx_audio.server` with Metal, works with `brew services`) and `mlx-audio-studio` (a prebuilt Studio with an `mlx-audio-studio` launcher): `brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab`, then `brew install mlx-audio`.
+  - Native mode finds `mlx_audio.server` on the `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin`, before falling back to `python -m mlx_audio.server`. The new setting `soundLab.mlx.server` (plugin: `mlx_server`) pins the binary, for example when a conda or venv shadows the Homebrew one.
+  - mlx-audio Studio runs from the prebuilt Homebrew bundle (no `npm install`, no `next dev`) when the API URL baked into it matches Sound Lab's; otherwise the download-and-`next dev` path is used as before, and the log says why.
+  - Plugin `mlx-service` skill: the Homebrew route for native mode, and podman troubleshooting on macOS (stopped machine, missing default connection, 2 GiB VM, no Metal).
 - **Voice clone**: guided recording of 5 prompted sentences with per-take quality checks, consent capture, reference building and transcription, and a cloned-voice preview. Then presentation re-narration (transcribe a talk and narrate in sync, adding a video track), audiobook production (chapters, ACX-style mastering, chapter markers), or vocals over an instrumental (beat-grid placement, tempo-synced echo, ducking, stem).
 - Fix: audio editor loudness meters were blocked by the webview CSP (inline styles). The UI harnesses now run under the real CSP.
 - Fix: MP4 track names are written to `handler_name` (MP4 drops `title`). This affected dub tracks in the plugin too.

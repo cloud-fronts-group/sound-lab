@@ -18,6 +18,7 @@ Use `FFMPEG=/path FFPROBE=/path npm test` to test against a different ffmpeg bui
 - VS Code extension: `src/`, `media/`, `test/`, `package.json` (everything below until "Claude Code plugin").
 - Claude Code plugin marketplace: `.claude-plugin/marketplace.json` → `plugins/sound-lab-studio/` (skills, agents, hooks, zero-dependency MCP server in `mcp/`, scripts, containers). Tests: `cd plugins/sound-lab-studio && npm test`. Validate: `claude plugin validate plugins/sound-lab-studio && claude plugin validate .`
 - Container images: `plugins/sound-lab-studio/containers/` (built by `.github/workflows/containers.yml` to GHCR).
+- `Formula/` — Homebrew tap (`mlx-audio`, `mlx-audio-studio`); install with `brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab`. Excluded from the VSIX, like `notebooks/`.
 
 ## CI, versioning and releases
 - `.github/workflows/ci.yml` runs on every PR and push to `main`: version lockstep check, `npm test` (Ubuntu Node 20/22 + macOS), `npm run test:ui` (Playwright; screenshots uploaded as an artifact), plugin tests (Node 20/22) + `claude plugin validate`, and a VSIX artifact.
@@ -97,6 +98,9 @@ test/ui/harness.js      Playwright webview check
 
 - mlx-audio reads `ref_audio` as a **path on the server's filesystem** (no upload). Voice references live in `globalStorage/voices` and are mounted read-only at `/soundlab/voices` for container modes (`MlxAudioClient.serverPath`).
 - mlx-audio Studio (`mlx_audio/ui`, Next.js) is **not in the pip wheel**. `StudioManager` locates or downloads it and runs `next dev` with `NEXT_PUBLIC_API_BASE_URL`/`NEXT_PUBLIC_API_PORT` pointing at the managed server. Embed it via `asExternalUri` and add the origin to `frame-src`.
+- Podman/Docker/Apple `container` on macOS never see Metal; the podman VM also defaults to 2 GiB RAM and the CLI needs a default connection (`podman system connection default`). The Apple-GPU path is native, and the Homebrew formulae are the supported way to install it.
+- The Homebrew Studio is a Next.js standalone build with the API base URL baked in at build time (`studio.json` `"api"`); `StudioManager` only uses it when that matches the configured API URL.
+- Native mode resolves `mlx_audio.server` as: `soundLab.mlx.server` → `PATH` → `/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin` → `python -m mlx_audio.server`. The extension host's `PATH` is often minimal and a conda env can shadow the Homebrew binary, so never rely on `PATH` alone.
 - Webview CSP forbids inline `style="…"` attributes, including in `innerHTML` templates. Use classes, or set `element.style` from script. The UI harnesses run under the real CSP, so violations fail the run.
 - MP4 drops the `title` stream tag. Write `handler_name` too.
 - A lavfi "microphone" renders faster than real time. Add `arealtime` when it stands in for live recording.

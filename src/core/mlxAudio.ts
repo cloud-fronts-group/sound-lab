@@ -8,6 +8,7 @@
 //   apple-container  Apple's `container` CLI (macOS 26, Apple silicon): Linux micro-VM, CPU MLX.
 //   external         an already-running server at `url`.
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { spawn, spawnSync, ChildProcess } from 'child_process';
 
@@ -22,12 +23,15 @@ export interface MlxConfig {
   port: number;
   image: string;
   gpu: 'none' | 'nvidia';
-  python: string;        // for native mode when `mlx_audio.server` isn't on PATH
+  python: string;        // for native mode when no `mlx_audio.server` executable is found (see findExecutable)
   hfCache: string;
   logDir: string;
   /** Host folder with voice-clone references; mounted read-only at /soundlab/voices in container modes. */
   voicesDir?: string;
-  binaries?: Partial<Record<'docker' | 'podman' | 'container' | 'mlx_audio.server' | 'npm' | 'git' | 'tar', string>>;
+  /** Overrides for the programs Sound Lab spawns (an explicit `mlx_audio.server` setting; fakes in tests). */
+  binaries?: Partial<Record<'docker' | 'podman' | 'container' | 'mlx_audio.server' | 'mlx-audio-studio' | 'node' | 'npm' | 'git' | 'tar', string>>;
+  /** Directories tried after PATH for native binaries; default WELL_KNOWN_BIN_DIRS (tests inject their own). */
+  searchDirs?: readonly string[];
 }
 
 export interface Health { reachable: boolean; url: string; loadedModels?: string[]; error?: string; status?: number }
@@ -35,12 +39,37 @@ export interface Segment { start: number; end: number; text: string }
 export interface Transcript { text: string; language?: string; segments: Segment[] }
 export interface Voice { id: string; name: string }
 
+/**
+ * Directories tried after PATH for native-mode executables (`mlx_audio.server`, the `mlx-audio-studio` launcher, `node`), in order:
+ * Homebrew on Apple silicon, Homebrew on Intel, pip/pipx `--user` installs. VS Code's extension host and launchd-started processes
+ * often have a minimal PATH, and an auto-activated conda env can shadow the Homebrew binary.
+ */
+export const WELL_KNOWN_BIN_DIRS: readonly string[] = ['/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin')];
+/** Prebuilt Studio bundles installed by the `mlx-audio-studio` Homebrew formula (<prefix>/opt/<formula> is the keg link), in search order. */
+export const HOMEBREW_STUDIO_DIRS: readonly string[] = ['/opt/homebrew/opt/mlx-audio-studio/libexec/ui', '/usr/local/opt/mlx-audio-studio/libexec/ui'];
+
+function fileIn(dir: string, cmd: string): string | null {
+  const exts = process.platform === 'win32' ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
+  for (const e of exts) { const p = path.join(dir, cmd + e); try { if (fs.statSync(p).isFile()) { return p; } } catch { /* next */ } }
+  return null;
+}
+
+/** PATH lookup. A name with a path separator is returned as it is when it exists. */
 export function which(cmd: string): string | null {
   if (cmd.includes('/') || cmd.includes('\\')) { return fs.existsSync(cmd) ? cmd : null; }
-  const exts = process.platform === 'win32' ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
-  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
-    for (const e of exts) { const p = path.join(dir, cmd + e); try { if (fs.statSync(p).isFile()) { return p; } } catch { /* next */ } }
-  }
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) { const p = fileIn(dir, cmd); if (p) { return p; } }
+  return null;
+}
+
+/**
+ * Find a native-mode executable: an explicit path or name wins (used as given), then PATH, then `dirs` (default WELL_KNOWN_BIN_DIRS).
+ * Null when nothing is found, so the caller can fall back (e.g. `python -m mlx_audio.server`).
+ */
+export function findExecutable(name: string, explicit?: string, dirs: readonly string[] = WELL_KNOWN_BIN_DIRS): string | null {
+  if (explicit) { return which(explicit) || explicit; }
+  const onPath = which(name);
+  if (onPath) { return onPath; }
+  for (const d of dirs) { const p = fileIn(d, name); if (p) { return p; } }
   return null;
 }
 
@@ -184,14 +213,18 @@ export class MlxAudioClient {
   }
 
   // ------------------------------------------------------------ lifecycle
-  plan(mode: MlxMode = this.cfg.mode): { cmd: string; args: string[] } | null {
+  plan(mode: MlxMode = this.cfg.mode): { cmd: string; args: string[]; note?: string } | null {
     const port = String(this.cfg.port);
     const hf = this.cfg.hfCache;
     switch (mode) {
       case 'native': {
-        const exe = this.cfg.binaries?.['mlx_audio.server'] || which('mlx_audio.server');
-        return exe ? { cmd: exe, args: ['--host', '127.0.0.1', '--port', port] }
-          : { cmd: this.cfg.python || 'python3', args: ['-m', 'mlx_audio.server', '--host', '127.0.0.1', '--port', port] };
+        // explicit setting → PATH → Homebrew's bin and ~/.local/bin → `<python> -m mlx_audio.server`
+        const exe = findExecutable('mlx_audio.server', this.cfg.binaries?.['mlx_audio.server'], this.cfg.searchDirs);
+        if (exe) { return { cmd: exe, args: ['--host', '127.0.0.1', '--port', port] }; }
+        const dirs = this.cfg.searchDirs ?? WELL_KNOWN_BIN_DIRS;
+        const python = this.cfg.python || 'python3';
+        return { cmd: python, args: ['-m', 'mlx_audio.server', '--host', '127.0.0.1', '--port', port],
+          note: `mlx_audio.server not found on PATH${dirs.length ? ` or in ${dirs.join(', ')}` : ''}; falling back to ${python} -m mlx_audio.server. Set the mlx_audio.server path explicitly if it is installed elsewhere.` };
       }
       case 'docker': case 'podman': {
         const gpu = this.cfg.gpu === 'nvidia' ? (mode === 'podman' ? ['--device', 'nvidia.com/gpu=all'] : ['--gpus', 'all']) : [];
@@ -212,6 +245,7 @@ export class MlxAudioClient {
     fs.mkdirSync(this.cfg.logDir, { recursive: true });
     const p = this.plan(mode)!;
     o.onLog?.(`$ ${p.cmd} ${p.args.join(' ')}`);
+    if (p.note) { o.onLog?.(p.note); }
     if (mode === 'native') {
       const log = fs.openSync(this.logFile, 'a');
       const child = spawn(p.cmd, p.args, { detached: true, stdio: ['ignore', log, log], env: process.env, windowsHide: true });
@@ -285,38 +319,101 @@ export function baseUrl(cfg: Pick<MlxConfig, 'url' | 'port'>): string {
   return (cfg.url || `http://127.0.0.1:${cfg.port}`).replace(/\/+$/, '').replace(/\/v1$/, '');
 }
 
-// ---------------------------------------------------------------- Studio (Next.js UI from mlx_audio/ui)
+// ---------------------------------------------------------------- Studio (mlx-audio's Next.js UI, mlx_audio/ui)
+//
+// Two kinds of Studio folder:
+//   dev       a checkout of mlx_audio/ui (package.json + app/): `npm install` once, then `next dev` with the API address in NEXT_PUBLIC_*.
+//   prebuilt  a standalone production build (server.js + .next/), as installed by the `mlx-audio-studio` Homebrew formula under
+//             <prefix>/opt/mlx-audio-studio/libexec/ui. Its API base URL is compiled into the build (studio.json "api"), so a bundle
+//             is only used when that address is Sound Lab's API address. It runs through its launcher script, else `node server.js`.
+
+export type StudioKind = 'dev' | 'prebuilt';
+
+/** studio.json of a prebuilt bundle: "api" = API base URL compiled into the build, "launcher" = absolute path of the launcher script. */
+export interface StudioManifest { name?: string; version?: string; api?: string; launcher?: string }
 
 export interface StudioConfig {
-  path?: string;          // explicit mlx_audio/ui folder
-  port: number;           // Studio dev server port (mlx-audio's own launcher uses 3000)
+  path?: string;          // explicit Studio folder (dev checkout or prebuilt bundle)
+  port: number;           // Studio port (mlx-audio's own launcher uses 3000)
   apiBase: string;        // browser-visible API base, e.g. http://localhost
   apiPort: number;        // browser-visible API port
   python: string;
   storageDir: string;     // where a downloaded copy of the UI lives
-  binaries?: MlxConfig['binaries'];
+  binaries?: MlxConfig['binaries'];  // npm/git/tar for a dev checkout; 'mlx-audio-studio' (launcher) and 'node' for a prebuilt bundle
   repo?: string;          // default Blaizzy/mlx-audio
   ref?: string;           // default main
+  searchDirs?: readonly string[];   // tried after PATH for the launcher and node; default WELL_KNOWN_BIN_DIRS (tests inject)
+  bundleDirs?: readonly string[];   // prebuilt bundles tried after the launcher's own; default HOMEBREW_STUDIO_DIRS (tests inject)
+}
+
+/** 'dev' for a checkout (package.json + app/), 'prebuilt' for a standalone build (server.js + .next/), null for anything else. */
+export function studioKind(dir?: string | null): StudioKind | null {
+  if (!dir) { return null; }
+  const has = (f: string) => fs.existsSync(path.join(dir, f));
+  return has('server.js') && has('.next') ? 'prebuilt' : has('package.json') && has('app') ? 'dev' : null;
+}
+
+export function readStudioManifest(dir: string): StudioManifest | null {
+  try { const j = JSON.parse(fs.readFileSync(path.join(dir, 'studio.json'), 'utf8')); return j && typeof j === 'object' ? j as StudioManifest : null; } catch { return null; }
+}
+
+function isExecutable(file: string): boolean {
+  try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); } catch { return false; }
 }
 
 export class StudioManager {
   private child?: ChildProcess;
   exited?: number;
+  /** Why the last locate() skipped candidates (e.g. a Homebrew bundle built for another API address); for the log and the dialog. */
+  lastLocateNote?: string;
   constructor(public cfg: StudioConfig) {}
 
   get url(): string { return `http://localhost:${this.cfg.port}`; }
+  /** The API address as the Studio's browser code must see it; a prebuilt bundle's studio.json "api" has to spell it the same way. */
+  get apiUrl(): string { return `${this.cfg.apiBase}:${this.cfg.apiPort}`; }
   get downloadDir(): string { return path.join(this.cfg.storageDir, 'mlx-audio-studio'); }
   private bin(n: 'npm' | 'git' | 'tar'): string { return this.cfg.binaries?.[n] || (process.platform === 'win32' && n === 'npm' ? 'npm.cmd' : n); }
 
-  /** Find a Studio checkout: explicit setting → editable mlx_audio install → previous download. */
+  /** Prebuilt bundle candidates: ../libexec/ui next to the real `mlx-audio-studio` launcher, then the Homebrew keg paths (existing, deduplicated). */
+  bundleCandidates(): string[] {
+    const dirs: string[] = [];
+    const launcher = findExecutable('mlx-audio-studio', this.cfg.binaries?.['mlx-audio-studio'], this.cfg.searchDirs);
+    if (launcher) { try { dirs.push(path.join(path.dirname(fs.realpathSync(launcher)), '..', 'libexec', 'ui')); } catch { /* dangling link */ } }
+    dirs.push(...(this.cfg.bundleDirs ?? HOMEBREW_STUDIO_DIRS));
+    const seen = new Set<string>();
+    return dirs.filter(d => { try { const real = fs.realpathSync(d); return seen.has(real) ? false : !!seen.add(real); } catch { return false; } });
+  }
+
+  /** Find a Studio: explicit setting → Homebrew prebuilt bundle → `ui` inside the mlx_audio package (editable install) → previous download. */
   locate(): string | null {
-    const ok = (p?: string | null) => !!p && fs.existsSync(path.join(p, 'package.json')) && fs.existsSync(path.join(p, 'app'));
-    if (ok(this.cfg.path)) { return this.cfg.path!; }
+    const notes: string[] = [];
+    const dir = this.find(notes);
+    this.lastLocateNote = notes.length ? notes.join('\n') : undefined;
+    return dir;
+  }
+
+  private find(notes: string[]): string | null {
+    const usable = (dir: string, label: string, trustWithoutManifest = false): boolean => {
+      if (studioKind(dir) !== 'prebuilt') { return true; }
+      const m = readStudioManifest(dir);
+      if (!m?.api) {
+        if (trustWithoutManifest) { return true; }
+        notes.push(`${label} (${dir}) has no studio.json naming the API address it was built for; skipped.`);
+        return false;
+      }
+      if (m.api.trim().replace(/\/+$/, '') === this.apiUrl) { return true; }
+      notes.push(`${label} is built for ${m.api}, Sound Lab's API is ${this.apiUrl} (${dir}); skipped because the API address is compiled into the build.`);
+      return false;
+    };
+    const explicit = this.cfg.path;
+    if (explicit && !studioKind(explicit)) { notes.push(`The configured Studio folder ${explicit} is not a Studio (needs package.json + app/, or server.js + .next/); ignored.`); }
+    if (studioKind(explicit) && usable(explicit!, 'The configured Studio', true)) { return explicit!; }
+    for (const dir of this.bundleCandidates()) { if (studioKind(dir) === 'prebuilt' && usable(dir, 'Homebrew Studio')) { return dir; } }
     const r = spawnSync(this.cfg.python, ['-c', 'import mlx_audio, pathlib; print(pathlib.Path(mlx_audio.__file__).parent / "ui")'], { encoding: 'utf8', timeout: 20_000 });
     const fromPkg = (r.stdout || '').trim();
-    if (r.status === 0 && ok(fromPkg)) { return fromPkg; }
+    if (r.status === 0 && studioKind(fromPkg) && usable(fromPkg, 'The Studio in the mlx_audio package')) { return fromPkg; }
     const dl = path.join(this.downloadDir, 'mlx_audio', 'ui');
-    return ok(dl) ? dl : null;
+    return studioKind(dl) && usable(dl, 'The downloaded Studio') ? dl : null;
   }
 
   /** Sparse-clone just mlx_audio/ui (git), falling back to a GitHub tarball (tar). */
@@ -354,27 +451,48 @@ export class StudioManager {
     try { const r = await fetch(this.url, { signal: AbortSignal.timeout(3000) }); return r.status < 500; } catch { return false; }
   }
 
-  /** npm install (first time) then `next dev -p <port>` with the API location baked into NEXT_PUBLIC_*. */
+  /**
+   * Dev checkout: npm install (first time) then `next dev -p <port>` with the API location baked into NEXT_PUBLIC_*.
+   * Prebuilt bundle: no npm; the launcher named in studio.json (--port/--host), else `node server.js`, with PORT and HOSTNAME set.
+   */
   async start(dir: string, o: { onLog?: (l: string) => void; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<{ url: string; started: boolean }> {
     if (await this.reachable()) { return { url: this.url, started: false }; }
-    const npm = this.bin('npm');
-    const stamp = path.join(dir, 'node_modules', '.soundlab-installed');
-    if (!fs.existsSync(stamp)) {
-      o.onLog?.(`$ npm install   (in ${dir})`);
-      await runStreaming(npm, ['install', '--no-audit', '--no-fund', '--loglevel=error'], dir, process.env, o.onLog, o.signal, 1_800_000);
-      fs.writeFileSync(stamp, new Date().toISOString());
+    const kind = studioKind(dir) || 'dev';
+    const port = String(this.cfg.port);
+    let cmd: string, args: string[], env: NodeJS.ProcessEnv;
+    if (kind === 'prebuilt') {
+      const m = readStudioManifest(dir);
+      const launcher = m?.launcher && isExecutable(m.launcher) ? m.launcher : null;
+      const node = findExecutable('node', this.cfg.binaries?.node, this.cfg.searchDirs) || 'node';
+      [cmd, args] = launcher ? [launcher, ['--port', port, '--host', '127.0.0.1']] : [node, ['server.js']];
+      env = { ...process.env, PORT: port, HOSTNAME: '127.0.0.1', NEXT_TELEMETRY_DISABLED: '1' };
+      o.onLog?.(`$ ${cmd} ${args.join(' ')}   (prebuilt Studio in ${dir}${m?.api ? `, built for API ${m.api}` : ''})`);
+    } else {
+      const npm = this.bin('npm');
+      const stamp = path.join(dir, 'node_modules', '.soundlab-installed');
+      if (!fs.existsSync(stamp)) {
+        o.onLog?.(`$ npm install   (in ${dir})`);
+        await runStreaming(npm, ['install', '--no-audit', '--no-fund', '--loglevel=error'], dir, process.env, o.onLog, o.signal, 1_800_000);
+        fs.writeFileSync(stamp, new Date().toISOString());
+      }
+      [cmd, args] = [npm, ['exec', '--', 'next', 'dev', '-p', port]];
+      env = { ...process.env, PORT: port, NEXT_PUBLIC_API_BASE_URL: this.cfg.apiBase, NEXT_PUBLIC_API_PORT: String(this.cfg.apiPort), NEXT_TELEMETRY_DISABLED: '1', BROWSER: 'none' };
+      o.onLog?.(`$ npx next dev -p ${port}   (API ${this.apiUrl})`);
     }
-    const env = { ...process.env, PORT: String(this.cfg.port), NEXT_PUBLIC_API_BASE_URL: this.cfg.apiBase, NEXT_PUBLIC_API_PORT: String(this.cfg.apiPort), NEXT_TELEMETRY_DISABLED: '1', BROWSER: 'none' };
-    o.onLog?.(`$ npx next dev -p ${this.cfg.port}   (API ${this.cfg.apiBase}:${this.cfg.apiPort})`);
     this.exited = undefined;
-    this.child = spawn(npm, ['exec', '--', 'next', 'dev', '-p', String(this.cfg.port)], { cwd: dir, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' });
+    let failure: Error | undefined;
+    const child = this.child = spawn(cmd, args, { cwd: dir, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' });
     const pipe = (d: Buffer) => d.toString().split(/\r?\n/).filter(Boolean).forEach(l => o.onLog?.(l));
-    this.child.stdout?.on('data', pipe); this.child.stderr?.on('data', pipe);
-    this.child.once('exit', c => { this.exited = c ?? -1; this.child = undefined; });
+    child.stdout?.on('data', pipe); child.stderr?.on('data', pipe);
+    const done = (code: number) => { this.exited = code; if (this.child === child) { this.child = undefined; } };
+    child.once('error', e => { failure = e; done(-1); });
+    child.once('exit', c => done(c ?? -1));
     const until = Date.now() + (o.timeoutMs ?? 240_000);
     while (Date.now() < until) {
       if (o.signal?.aborted) { this.stop(); throw new Error('Cancelled'); }
-      if (this.exited !== undefined) { throw new Error(`Studio dev server exited with code ${this.exited}. See the Sound Lab log.`); }
+      if (this.exited !== undefined) {
+        throw new Error(failure ? `Could not start mlx-audio Studio (${cmd}): ${failure.message}` : `Studio ${kind === 'prebuilt' ? 'server' : 'dev server'} exited with code ${this.exited}. See the Sound Lab log.`);
+      }
       if (await this.reachable()) { return { url: this.url, started: true }; }
       await new Promise(r => setTimeout(r, 1000));
     }
@@ -384,6 +502,7 @@ export class StudioManager {
 
   get running(): boolean { return !!this.child; }
 
+  /** Kills the Studio's process group (launcher + node, or npm + next), like a Ctrl-C in its terminal. */
   stop(): boolean {
     const c = this.child;
     if (!c?.pid) { return false; }

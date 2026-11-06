@@ -30,7 +30,7 @@ ffmpeg -i in.mov -c:v prores_videotoolbox -profile:v 3 out.mov   # ProRes 422 HQ
 ## Speech on the Apple GPU
 | Option | Install | Notes |
 |---|---|---|
-| **MLX audio service** (recommended) | `pip install "mlx-audio[server]"` → `mlx_audio.server --port 8000` | STT (Whisper, Parakeet…), TTS (Kokoro…), source separation over an OpenAI-style API. The MCP `mlx_service` tool starts it (`mode: native`) |
+| **MLX audio service** (recommended) | `brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab && brew install mlx-audio` → `/opt/homebrew/bin/mlx_audio.server` (`brew services start mlx-audio` keeps it on :8000; `brew install mlx-audio-studio` adds the Studio UI). Or `pip install "mlx-audio[server]"` | STT (Whisper, Parakeet…), TTS (Kokoro…), source separation over an OpenAI-style API. The MCP `mlx_service` tool starts it (`mode: native`) and finds the Homebrew binary even when it is not on PATH (setting `mlx_server` overrides) |
 | mlx-whisper CLI | `pip install mlx-whisper` | `mlx_whisper in.m4a --model mlx-community/whisper-large-v3-turbo --output-format srt` |
 | whisper.cpp | `brew install whisper-cpp` | Metal is on by default on macOS. Download a ggml model |
 

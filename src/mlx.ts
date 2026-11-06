@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { MlxAudioClient, MlxMode, StudioManager, Health } from './core/mlxAudio';
+import { MlxAudioClient, MlxMode, StudioManager, Health, studioKind } from './core/mlxAudio';
 import { cfg, job, log, logLine, state, storageDir, resolveTargets, outputFor, uniquePath, announce, openMedia, summaryOf } from './util';
 
 export const STT_MODELS = ['mlx-community/whisper-large-v3-turbo', 'mlx-community/whisper-small-mlx', 'mlx-community/whisper-tiny', 'mlx-community/parakeet-tdt-0.6b-v2', 'mlx-community/distil-whisper-large-v3'];
@@ -59,11 +59,13 @@ export class MlxController implements vscode.Disposable {
     const c = cfg();
     const port = c.get<number>('mlx.port') || 8000;
     const gpu = (c.get<string>('mlx.gpu') || 'none') as 'none' | 'nvidia';
+    const server = c.get<string>('mlx.server') || '';   // explicit mlx_audio.server; empty = PATH, Homebrew's bin, ~/.local/bin, then python -m
     this.client = new MlxAudioClient({
       mode: this.mode, url: c.get<string>('mlx.url') || undefined, port,
       image: c.get<string>('mlx.image') || `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:${gpu === 'nvidia' ? 'cuda12' : 'cpu'}`,
       gpu, python: c.get<string>('mlx.python') || 'python3',
       hfCache: path.join(os.homedir(), '.cache', 'huggingface'), logDir: storageDir('mlx'), voicesDir: this.voicesDir,
+      binaries: server ? { 'mlx_audio.server': server } : undefined,
     });
     const api = new URL(this.client.url);
     this.studio?.stop();
@@ -221,11 +223,14 @@ export class MlxController implements vscode.Disposable {
   async ensureStudio(): Promise<string | undefined> {
     if (await this.studio.reachable()) { return this.studio.url; }
     let dir: string | null | undefined = this.studio.locate();
+    const note = this.studio.lastLocateNote;   // e.g. a Homebrew Studio built for another API port
+    if (note) { log(`mlx-audio Studio: ${note}`); }
+    if (dir) { log(`mlx-audio Studio: ${studioKind(dir) === 'prebuilt' ? 'prebuilt bundle' : 'dev checkout'} at ${dir}`); }
     if (!dir) {
       const pick = await vscode.window.showInformationMessage('mlx-audio Studio (the web UI) is not installed with the pip package. Download it from GitHub (Blaizzy/mlx-audio, about 1 MB of source plus npm dependencies)?',
-        { modal: true }, 'Download Studio', 'Choose Folder…');
+        { modal: true, detail: note }, 'Download Studio', 'Choose Folder…');
       if (pick === 'Choose Folder…') {
-        const f = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: 'Use this mlx_audio/ui folder' });
+        const f = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: 'Use this Studio folder' });
         if (!f) { return; }
         await cfg().update('mlx.studio.path', f[0].fsPath, vscode.ConfigurationTarget.Global);
         dir = f[0].fsPath;
@@ -235,8 +240,9 @@ export class MlxController implements vscode.Disposable {
       if (!dir) { return; }
     }
     await this.ensure();
-    const ok = await job('Starting mlx-audio Studio (first run installs npm packages)', async (rep, signal) => {
-      rep(0.05, 'npm install / next dev…');
+    const prebuilt = studioKind(dir) === 'prebuilt';
+    const ok = await job(prebuilt ? 'Starting mlx-audio Studio' : 'Starting mlx-audio Studio (first run installs npm packages)', async (rep, signal) => {
+      rep(0.05, prebuilt ? 'Starting the Studio server…' : 'npm install / next dev…');
       return this.studio.start(dir!, { onLog: logLine, signal });
     });
     this.refresh();

@@ -12,7 +12,7 @@ Then `/plugin` → **Sound Lab Studio** → *Configure* to set the runner, the M
 **Requirements:**
 - Node 18+ and `ffmpeg`/`ffprobe` on PATH (`brew install ffmpeg` · `apt install ffmpeg` · `winget install ffmpeg`).
 - Optional, by feature:
-  - Apple Silicon speech: `pip install "mlx-audio[server]"` (MLX service) or `pip install mlx-whisper`.
+  - Apple Silicon speech (MLX service): `brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab && brew install mlx-audio` puts `mlx_audio.server` in Homebrew's bin (`brew services start mlx-audio` keeps it on 127.0.0.1:8000; `brew install mlx-audio-studio` adds the Studio web UI). Or `pip install "mlx-audio[server]"`, or `pip install mlx-whisper` for transcription only.
   - NVIDIA: Docker plus the NVIDIA Container Toolkit for the `:cuda12` image.
   - whisper.cpp with a ggml model.
   - `OPENAI_API_KEY` for an OpenAI-compatible speech API.
@@ -39,7 +39,7 @@ Then `/plugin` → **Sound Lab Studio** → *Configure* to set the runner, the M
 | Agent | `mp3-expert` | LAME modes, ID3/art/chapters, gapless, diagnostics |
 | Agent | `mp4-expert` | faststart/fMP4/CMAF, hvc1 vs hev1, tracks and dispositions, HDR, VideoToolbox, HLS |
 | Agent | `soundlab-agent` | Live "QWERTY keyboard" ambient performance that slowly builds from pulse to chorus; can render to audio |
-| Hook | SessionStart | One line of environment facts (ffmpeg version, HW encoders, Apple Silicon, tools, unfinished jobs) |
+| Hook | SessionStart | One line of environment facts (ffmpeg version, HW encoders, Apple Silicon, tools — including a Homebrew `mlx_audio.server` that is not on PATH — unfinished jobs) |
 | Hook | PreToolUse(Bash) | **Blocks ffmpeg commands that would overwrite their own input** |
 | Hook | PostToolUse(Bash) | ffprobes every ffmpeg output. Flags missing, empty or unreadable files |
 | MCP | `sound-lab-media` | Background jobs (below) |
@@ -56,10 +56,12 @@ Then `/plugin` → **Sound Lab Studio** → *Configure* to set the runner, the M
 |---|---|---|
 | `runner: local` (default) | host ffmpeg | Apple VideoToolbox/AudioToolbox on Macs, NVENC etc. elsewhere |
 | `runner: docker`/`podman` | `ghcr.io/cloud-fronts-group/sound-lab-ffmpeg` | CPU. `container_gpu: nvidia` or `dri` for passthrough |
-| `mlx_mode: native` (default on Apple Silicon) | host `mlx_audio.server` | **Apple GPU (Metal)** |
+| `mlx_mode: native` (default on Apple Silicon) | host `mlx_audio.server` (Homebrew formula `mlx-audio` or pip) | **Apple GPU (Metal)** |
 | `mlx_mode: docker`/`podman` + `mlx_gpu: nvidia` | `…/sound-lab-mlx-audio:cuda12` (`pip install mlx[cuda12]`) | **NVIDIA CUDA 12** |
 | `mlx_mode: docker`/`podman`/`apple-container` | `…/sound-lab-mlx-audio:cpu` (`mlx[cpu]`) | CPU |
 | `mlx_mode: external` | any mlx-audio server at `mlx_url` | wherever it runs |
+
+Native mode finds the server in this order: the `mlx_server` setting (an explicit path), `mlx_audio.server` on PATH, then `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin` (Claude Code, VS Code and launchd often have a minimal PATH, and an auto-activated conda env can shadow the Homebrew binary), else `python3 -m mlx_audio.server`. `capabilities` reports the result as `mlxService.server`, and `mlx_service {"action":"plan"}` shows the exact command.
 
 Docker Desktop and Apple's `container` run Linux VMs that **cannot reach Metal**, so MLX inside them on a Mac runs on the CPU. The fast path on a Mac is `native`. For GPU work inside a container on macOS, use Podman with a libkrun machine (Vulkan → Metal) and the `whisper-vulkan` image (`container_gpu: dri`).
 

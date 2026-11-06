@@ -141,6 +141,24 @@ Leave `record.inputFormat` empty to use the platform's default (`avfoundation` o
 
 How each backend uses them is in [Transcription and subtitles](transcription.md).
 
+## mlx-audio
+
+The speech features (text-to-speech, the `mlx-audio` transcription backend, voice cloning and separation) use the [mlx-audio](https://github.com/Blaizzy/mlx-audio) API server. These settings choose how Sound Lab runs it and where the embedded mlx-audio Studio comes from. The model choices (`soundLab.mlx.sttModel`, `ttsModel`, `ttsVoice`, `cloneModel`, `separationModel`), the container settings (`image`, `gpu`) and the lifecycle switches (`autoStart`, `stopOnExit`, `showStatusBar`) are described in the Settings UI.
+
+| Setting | Type | Default | What it does |
+|---|---|---|---|
+| `soundLab.mlx.mode` | string (`auto`, `native`, `docker`, `podman`, `apple-container`, `external`) | `"auto"` | How Sound Lab runs the mlx-audio API server. `auto` is `native` on Apple Silicon and `docker` elsewhere. Containers on macOS have no Metal access, so the Apple-GPU path is `native`. |
+| `soundLab.mlx.url` | string | `""` | Base URL of an mlx-audio server (mode `external`, or to override). Empty = `http://127.0.0.1:<port>`. |
+| `soundLab.mlx.port` | number | `8000` | Port of the mlx-audio API server. |
+| `soundLab.mlx.python` | string | `"python3"` | Python with `mlx-audio[server]` installed, for native mode. Used only when no `mlx_audio.server` executable is found (see `server`). |
+| `soundLab.mlx.server` | string | `""` | Path to the `mlx_audio.server` executable for native mode. Empty = find it on the `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin`; when nothing is found, `<soundLab.mlx.python> -m mlx_audio.server` is run instead. |
+| `soundLab.mlx.studio.path` | string | `""` | Folder of mlx-audio Studio: a checkout of `mlx_audio/ui` (`package.json` and `app/`) or a prebuilt standalone build (`server.js` and `.next/`). Empty = the Homebrew `mlx-audio-studio` bundle, then an editable mlx-audio install, then a download on first use. |
+| `soundLab.mlx.studio.port` | number | `3000` | Port the embedded mlx-audio Studio listens on. |
+
+**Native mode and Homebrew.** `brew install mlx-audio` from the `cloud-fronts-group/sound-lab` tap (see the [README](../README.md#mlx-audio-local-speech-ai-inside-vs-code)) puts `mlx_audio.server` in `/opt/homebrew/bin` (Apple Silicon) or `/usr/local/bin` (Intel). VS Code's extension host often starts with a minimal `PATH`, and an auto-activated conda or venv can put another `mlx_audio.server` first, so Sound Lab checks the well-known folders itself; set `soundLab.mlx.server` when you need a particular binary. Like `ffmpegPath`, the value is passed to the operating system as-is: no `~`, no environment variables.
+
+**The Homebrew Studio.** `brew install mlx-audio-studio` installs a prebuilt Studio whose API address is fixed at build time to `http://localhost:8000` (its `studio.json` records it). Sound Lab uses that build only when the address matches your API, which means the default `soundLab.mlx.port` and a local server; with another port or an `external` URL it logs why it skipped the bundle and falls back to a downloaded Studio in dev mode. `soundLab.mlx.studio.path` always wins when it is set.
+
 ## Ready-made `settings.json` blocks
 
 **Sampler workflow**: 16-bit / 44.1 kHz material, exports collected in one folder, silence splitting tuned for drum hits.
@@ -210,6 +228,15 @@ Remember that a non-zero `defaults.sampleRate` resamples every edit to 44.1 kHz.
 {
   "soundLab.ffmpegPath": "/opt/homebrew/bin/ffmpeg",
   "soundLab.ffprobePath": "/opt/homebrew/bin/ffprobe"
+}
+```
+
+**mlx-audio from Homebrew on Apple Silicon**, when a conda or venv on your `PATH` shadows the Homebrew server, or VS Code cannot see your shell's `PATH`:
+
+```jsonc
+{
+  "soundLab.mlx.mode": "native",
+  "soundLab.mlx.server": "/opt/homebrew/bin/mlx_audio.server"
 }
 ```
 

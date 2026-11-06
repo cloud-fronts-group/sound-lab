@@ -9,6 +9,7 @@ This page takes you from nothing to a trimmed, normalized, converted sample, and
 | VS Code | 1.85 or newer (`engines.vscode` is `^1.85.0`) |
 | FFmpeg and ffprobe | On your `PATH`, or set `soundLab.ffmpegPath` and `soundLab.ffprobePath`. The README names 4.4 as the minimum. The extension does not check the version at start-up; it only detects which filters and encoders your build has |
 | Transcription (optional) | One of: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (`whisper-cli` plus a `ggml-*.bin` model), any OpenAI-compatible `/audio/transcriptions` endpoint, or FFmpeg 8+ built with `--enable-whisper`. See [Transcription](transcription.md) |
+| mlx-audio (optional) | Local text-to-speech, MLX transcription, voice cloning and separation on an Apple-silicon Mac: `brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab`, then `brew install mlx-audio`. See [mlx-audio in the README](../README.md#mlx-audio-local-speech-ai-inside-vs-code) |
 | Node.js (development only) | 20 or newer. The test suites were run on Node 22 |
 
 Install FFmpeg with your package manager:

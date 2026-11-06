@@ -204,3 +204,112 @@ test('Studio manager: locate a checkout; reachable() false when nothing listens'
   const none = new StudioManager({ port: 1, apiBase: 'http://localhost', apiPort: port, python: '/nonexistent-python', storageDir: p('store2') });
   assert.equal(none.locate(), null);
 });
+
+test('findExecutable: explicit path wins, then PATH, then well-known dirs; plan(native) falls back to python', () => {
+  const { findExecutable, WELL_KNOWN_BIN_DIRS } = require('../out/core/mlxAudio');
+  const fakeServer = (d) => { fs.mkdirSync(d, { recursive: true }); const f = path.join(d, 'mlx_audio.server'); fs.writeFileSync(f, '#!/bin/sh\nexit 0\n'); fs.chmodSync(f, 0o755); return f; };
+  const onPath = fakeServer(p('path-bin')); const brew = fakeServer(p('brew-bin'));
+  const base = { mode: 'native', port: 8123, image: '', gpu: 'none', python: '/venv/bin/python', hfCache: p('hf'), logDir: p('logs4') };
+  const savedPath = process.env.PATH;
+  try {
+    process.env.PATH = path.dirname(onPath);
+    assert.equal(findExecutable('mlx_audio.server', '/explicit/mlx_audio.server'), '/explicit/mlx_audio.server', 'explicit wins, even over a PATH hit');
+    assert.equal(findExecutable('mlx_audio.server'), onPath, 'PATH hit');
+    assert.deepEqual(new MlxAudioClient(base).plan('native'), { cmd: onPath, args: ['--host', '127.0.0.1', '--port', '8123'] });
+    assert.equal(new MlxAudioClient({ ...base, binaries: { 'mlx_audio.server': '/explicit/mlx_audio.server' } }).plan('native').cmd, '/explicit/mlx_audio.server');
+    process.env.PATH = '';
+    assert.equal(findExecutable('mlx_audio.server', undefined, []), null);
+    assert.equal(findExecutable('mlx_audio.server', undefined, [p('nope'), path.dirname(brew), path.dirname(onPath)]), brew, 'well-known dirs, in order');
+    assert.deepEqual(WELL_KNOWN_BIN_DIRS.slice(0, 2), ['/opt/homebrew/bin', '/usr/local/bin']);
+    assert.equal(WELL_KNOWN_BIN_DIRS[2], path.join(os.homedir(), '.local', 'bin'));
+    const fallback = new MlxAudioClient({ ...base, searchDirs: [] }).plan('native');
+    assert.equal(fallback.cmd, '/venv/bin/python');
+    assert.deepEqual(fallback.args, ['-m', 'mlx_audio.server', '--host', '127.0.0.1', '--port', '8123']);
+    assert.match(fallback.note, /mlx_audio\.server not found/);
+    assert.equal(new MlxAudioClient({ ...base, searchDirs: [p('nope'), path.dirname(brew)] }).plan('native').cmd, brew, 'plan() searches the injected well-known dirs');
+    const prod = new MlxAudioClient(base).plan('native'); // production list: a real Homebrew/pip install on this machine, or the python fallback
+    assert.ok(prod.cmd === '/venv/bin/python' || WELL_KNOWN_BIN_DIRS.some(d => prod.cmd.startsWith(d + path.sep)), prod.cmd);
+  } finally { process.env.PATH = savedPath; }
+});
+
+test('Studio prebuilt bundle (Homebrew): locate via launcher + studio.json api, start without npm, stop kills it, node fallback', async () => {
+  const { studioKind, readStudioManifest, HOMEBREW_STUDIO_DIRS } = require('../out/core/mlxAudio');
+  const FIX = path.join(__dirname, 'fixtures');
+  const forbiddenNpm = path.join(BIN, 'npm-forbidden');
+  const makeBundle = (dir, manifest) => {
+    fs.mkdirSync(path.join(dir, '.next', 'static'), { recursive: true }); fs.mkdirSync(path.join(dir, 'node_modules'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.next', 'BUILD_ID'), 'test-build');
+    fs.copyFileSync(path.join(FIX, 'studio-server.js'), path.join(dir, 'server.js'));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'mlx-audio-studio', version: '0.6.4', private: true }));
+    if (manifest) { fs.writeFileSync(path.join(dir, 'studio.json'), JSON.stringify(manifest)); }
+    return dir;
+  };
+  // a fake Homebrew keg: Cellar/mlx-audio-studio/0.6.4/{bin/mlx-audio-studio, libexec/ui}, linked from <prefix>/bin like Homebrew does
+  const keg = p('brew/Cellar/mlx-audio-studio/0.6.4');
+  const launcher = path.join(keg, 'bin', 'mlx-audio-studio');
+  const link = p('brew/bin/mlx-audio-studio');
+  fs.mkdirSync(path.dirname(launcher), { recursive: true }); fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.copyFileSync(path.join(FIX, 'studio-launcher.js'), launcher); fs.chmodSync(launcher, 0o755);
+  fs.symlinkSync(path.relative(path.dirname(link), launcher), link);
+  // real path: the launcher-derived candidate comes from fs.realpathSync(launcher) (macOS /var/folders → /private/var/folders)
+  const ui = fs.realpathSync(makeBundle(path.join(keg, 'libexec', 'ui'), { name: 'mlx-audio-studio', version: '0.6.4', api: `http://localhost:${port}`, launcher }));
+  const dev = p('studio-dev'); fs.mkdirSync(path.join(dev, 'app'), { recursive: true }); fs.writeFileSync(path.join(dev, 'package.json'), '{}');
+  const studioPort = await freePort();
+  const mk = (over = {}) => new StudioManager({ port: studioPort, apiBase: 'http://localhost', apiPort: port, python: '/nonexistent-python', storageDir: p('store3'), searchDirs: [], bundleDirs: [], binaries: { 'mlx-audio-studio': link, npm: forbiddenNpm, node: process.execPath }, ...over });
+  const gone = async (s) => { for (let i = 0; i < 50 && await s.reachable(); i++) { await new Promise(r => setTimeout(r, 100)); } assert.equal(await s.reachable(), false, 'Studio port released after stop()'); };
+
+  assert.equal(studioKind(ui), 'prebuilt'); assert.equal(studioKind(dev), 'dev'); assert.equal(studioKind(p('nope')), null); assert.equal(studioKind(undefined), null);
+  assert.equal(readStudioManifest(ui).launcher, launcher);
+  assert.deepEqual(HOMEBREW_STUDIO_DIRS, ['/opt/homebrew/opt/mlx-audio-studio/libexec/ui', '/usr/local/opt/mlx-audio-studio/libexec/ui']);
+  // locate(): the launcher symlink is resolved to its keg and ../libexec/ui is used when "api" matches Sound Lab's API address
+  const s = mk();
+  assert.deepEqual(s.bundleCandidates(), [ui]);
+  assert.equal(s.locate(), ui);
+  assert.equal(s.lastLocateNote, undefined);
+  assert.equal(mk({ path: dev }).locate(), dev, 'an explicit folder wins');
+  const badPath = mk({ path: p('nope') });
+  assert.equal(badPath.locate(), ui, 'an explicit folder that is no Studio is ignored');
+  assert.match(badPath.lastLocateNote, /is not a Studio/);
+  assert.equal(mk({ binaries: { npm: forbiddenNpm }, bundleDirs: [p('nope'), ui] }).locate(), ui, 'keg dirs are tried after the launcher');
+  // api mismatch: skipped with a reason, nothing else found → null
+  const other = mk({ apiPort: port + 1 });
+  assert.equal(other.locate(), null);
+  assert.match(other.lastLocateNote, new RegExp(`Homebrew Studio is built for http://localhost:${port}, Sound Lab's API is http://localhost:${port + 1}`));
+  const explicitMismatch = mk({ path: ui, apiPort: port + 1, binaries: { npm: forbiddenNpm } });
+  assert.equal(explicitMismatch.locate(), null);
+  assert.match(explicitMismatch.lastLocateNote, /The configured Studio is built for/);
+  const unlabeled = makeBundle(p('bundle-unlabeled'), null);
+  assert.equal(mk({ path: unlabeled }).locate(), unlabeled, 'an explicit bundle without studio.json is trusted');
+  assert.equal(mk({ bundleDirs: [unlabeled], binaries: { npm: forbiddenNpm } }).locate(), null, 'a found bundle without studio.json is not');
+
+  // start(): the launcher from studio.json with --port/--host, no npm at all; stop() kills launcher + server (process group)
+  const lines = [];
+  let s2;
+  try {
+    const r = await s.start(ui, { onLog: l => lines.push(l), timeoutMs: 30000 });
+    assert.equal(r.started, true); assert.equal(r.url, `http://localhost:${studioPort}`); assert.equal(s.running, true);
+    assert.equal((await fetch(s.url)).status, 200);
+    assert.ok(lines[0].startsWith(`$ ${launcher} --port ${studioPort} --host 127.0.0.1`), lines[0]);
+    assert.ok(!lines.some(l => /npm/.test(l)), lines.join('\n'));
+    assert.equal((await s.start(ui)).started, false, 'already running');
+    assert.equal(s.stop(), true); assert.equal(s.running, false);
+    await gone(s);
+    assert.equal(s.stop(), false);
+    // a bundle whose studio.json names no launcher is started with node server.js (PORT/HOSTNAME)
+    const plain = makeBundle(p('bundle-plain'), { api: `http://localhost:${port}` });
+    assert.equal(mk({ bundleDirs: [plain], binaries: { npm: forbiddenNpm } }).locate(), plain);
+    s2 = mk(); const lines2 = [];
+    const r2 = await s2.start(plain, { onLog: l => lines2.push(l), timeoutMs: 30000 });
+    assert.equal(r2.started, true);
+    assert.ok(lines2[0].startsWith(`$ ${process.execPath} server.js`), lines2[0]);
+    assert.match(await (await fetch(s2.url)).text(), new RegExp(`on 127\\.0\\.0\\.1:${studioPort}`));
+    assert.ok(!lines2.some(l => /npm/.test(l)), lines2.join('\n'));
+    assert.equal(s2.stop(), true);
+    await gone(s2);
+    // a broken launcher path fails with a clear error instead of hanging
+    const broken = makeBundle(p('bundle-broken'), { api: `http://localhost:${port}`, launcher: p('bundle-broken/missing-launcher') });
+    const s3 = mk({ binaries: { npm: forbiddenNpm, node: p('nonexistent-node') } });
+    await assert.rejects(s3.start(broken, { timeoutMs: 10000 }), /Could not start mlx-audio Studio/);
+    assert.equal(s3.running, false);
+  } finally { s.stop(); s2?.stop(); }
+});

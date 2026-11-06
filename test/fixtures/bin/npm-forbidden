@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+'use strict';
+// A stand-in for npm that must never run: a prebuilt Studio bundle needs no `npm install`. Fails loudly if invoked.
+process.stderr.write(`npm-forbidden: npm was invoked with ${JSON.stringify(process.argv.slice(2))} - a prebuilt Studio must not run npm\n`);
+process.exit(97);

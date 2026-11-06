@@ -2,7 +2,9 @@
 // Client + lifecycle for an MLX audio inference service (mlx-audio's OpenAI-compatible server, `mlx_audio.server`).
 //
 // The same HTTP API is served from wherever you run it. Pick the mode by hardware:
-//   native           host Python on macOS → MLX on the Apple GPU (Metal). Fastest on Apple Silicon.
+//   native           host `mlx_audio.server` on macOS (Homebrew formula cloud-fronts-group/sound-lab/mlx-audio or pip) → MLX on the
+//                    Apple GPU (Metal). Fastest on Apple Silicon. Found via setting mlx_server → PATH → Homebrew bin / ~/.local/bin,
+//                    else `python3 -m mlx_audio.server`.
 //   docker / podman  Linux container. Image tag :cuda12 = `mlx[cuda12]` on NVIDIA GPUs (needs --gpus / CDI);
 //                    tag :cpu = `mlx[cpu]`. Containers on macOS never see Metal, so on a Mac they run on the CPU.
 //   apple-container  Apple's `container` CLI (macOS 26, Apple silicon): Linux micro-VM, CPU MLX.
@@ -10,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const { findExecutable } = require('./ff');
 
 const CONTAINER_NAME = 'soundlab-mlx-audio';
 const CONTAINER_PORT = 8000;
@@ -17,7 +20,8 @@ const CONTAINER_PORT = 8000;
 class MlxService {
   /**
    * @param {{mode: string, url: string, port: number, image: string, gpu: string, hfCache: string, dataDir: string,
-   *          sttModel: string, ttsModel: string, ttsVoice: string, binaries?: Record<string,string>, which: (c:string)=>string|null}} cfg
+   *          sttModel: string, ttsModel: string, ttsVoice: string, binaries?: Record<string,string>}} cfg
+   *   binaries: overrides for docker / podman / container / python3, and 'mlx_audio.server' = the explicit server path (setting mlx_server).
    */
   constructor(cfg) {
     this.cfg = cfg;
@@ -27,6 +31,9 @@ class MlxService {
   }
 
   bin(name) { return this.cfg.binaries?.[name] || name; }
+
+  /** The mlx_audio.server native mode runs: setting mlx_server, else PATH, else Homebrew's bin / ~/.local/bin. null = `python3 -m mlx_audio.server`. */
+  serverExecutable() { return findExecutable('mlx_audio.server', this.cfg.binaries?.['mlx_audio.server']); }
 
   // ---------------------------------------------------------------- HTTP
   async request(pathname, init = {}, timeoutMs = 600000) {
@@ -134,7 +141,7 @@ class MlxService {
     const hf = this.cfg.hfCache;
     switch (mode) {
       case 'native': {
-        const exe = this.cfg.which('mlx_audio.server');
+        const exe = this.serverExecutable();
         return exe ? { cmd: exe, args: ['--host', '127.0.0.1', '--port', port] }
           : { cmd: this.bin('python3'), args: ['-m', 'mlx_audio.server', '--host', '127.0.0.1', '--port', port] };
       }
@@ -160,8 +167,16 @@ class MlxService {
     const p = this.plan(mode);
     if (mode === 'native') {
       const log = fs.openSync(this.logFile, 'a');
-      const child = spawn(p.cmd, p.args, { detached: true, stdio: ['ignore', log, log], env: process.env });
-      await new Promise((resolve, reject) => { child.once('error', reject); child.once('spawn', resolve); });
+      let child;
+      try {
+        child = spawn(p.cmd, p.args, { detached: true, stdio: ['ignore', log, log], env: process.env });
+        await new Promise((resolve, reject) => { child.once('error', reject); child.once('spawn', resolve); });
+      } catch (e) {
+        if (e.code !== 'ENOENT' && e.code !== 'EACCES') { throw e; }
+        throw new Error(`${p.cmd} ${e.code === 'ENOENT' ? 'not found' : 'is not executable'} (native mode would run: ${[p.cmd, ...p.args].join(' ')}). `
+          + 'Install mlx-audio with Homebrew (brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab && brew install mlx-audio) '
+          + 'or pip install "mlx-audio[server]", or point the mlx_server setting at mlx_audio.server.');
+      } finally { fs.closeSync(log); } // the child holds its own copy of the log fd
       this.nativeExit = undefined;
       child.once('exit', code => { this.nativeExit = code ?? -1; });
       child.unref();

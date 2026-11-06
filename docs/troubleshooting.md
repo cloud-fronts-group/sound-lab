@@ -88,6 +88,27 @@ Also useful: **Sound Lab: Show FFmpeg Capabilities** (which filters and encoders
 | **Add Subtitles** does nothing after *Transcribe this video first* | `srt` and `vtt` are missing from `soundLab.transcription.outputFormats` | Add `srt` |
 | Very slow | Large local model, or a slow network for uploads | Use a smaller model or more threads; or `openai-compatible` with a fast server |
 
+## mlx-audio
+
+The speech features (text-to-speech, the `mlx-audio` transcription backend, voice clone, separation) need the mlx-audio API server. Click the `MLX` status bar item to open its log. A server started with `brew services start mlx-audio` logs to `$(brew --prefix)/var/log/mlx-audio.log` instead.
+
+### mlx-audio server will not start in podman mode on macOS
+
+Check these, in order:
+
+- **The podman machine is stopped.** `podman machine list` shows it; `podman machine start` fixes it.
+- **No default connection, or a stale SSH port.** `podman info` fails, or hangs after the machine was recreated. Run `podman system connection list`, then `podman system connection default <name>` (usually `podman-machine-default`).
+- **The image cannot be pulled.** `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio` must be public, or you must be logged in (`podman login ghcr.io`). Check with `podman pull`.
+- **The VM has 2 GiB of RAM**, the podman default, and the models do not fit. With the machine stopped, run `podman machine set --memory 8192` (or more), then start it again.
+- **There is no Metal in the VM.** Even with everything above fixed, MLX in the container runs on the CPU only. The same is true of Docker Desktop and Apple `container`.
+
+**Fix:** on a Mac, use native mode. Install the server with Homebrew (`brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab`, then `brew install mlx-audio`) and set `soundLab.mlx.mode` to `native`, or leave it at `auto`, which picks `native` on Apple Silicon. Sound Lab finds `mlx_audio.server` in `/opt/homebrew/bin` even when VS Code's `PATH` does not include it; if a conda or venv binary gets in the way, set `soundLab.mlx.server` to `/opt/homebrew/bin/mlx_audio.server`. See [mlx-audio in the README](../README.md#mlx-audio-local-speech-ai-inside-vs-code).
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Native mode runs `python -m mlx_audio.server` (or fails with `No module named mlx_audio`) although `brew install mlx-audio` succeeded | `mlx_audio.server` was not found on VS Code's `PATH` or in `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin`, or `soundLab.mlx.server` points at a path that no longer exists | Run `which mlx_audio.server` in a terminal and put that path in `soundLab.mlx.server` |
+| Sound Lab downloads mlx-audio Studio and runs `next dev` although `brew install mlx-audio-studio` succeeded | The Homebrew Studio is built for the API at `http://localhost:8000`. Sound Lab skips it (the MLX log says why) when `soundLab.mlx.port` is not 8000, when the API is an `external` URL, or when the bundle's `studio.json` is missing | Use port 8000 with a local server, or set `soundLab.mlx.studio.path` to a checkout of `mlx_audio/ui` |
+
 ## Recording
 
 | Symptom | Likely cause | Fix |

@@ -1137,6 +1137,11 @@
           "default": "python3",
           "markdownDescription": "Python with `mlx-audio[server]` installed (native mode), e.g. a venv's `bin/python`."
         },
+        "soundLab.mlx.server": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to `mlx_audio.server` for native mode, e.g. Homebrew's `/opt/homebrew/bin/mlx_audio.server`. Empty = find it on PATH, then in Homebrew's bin (`/opt/homebrew/bin`, `/usr/local/bin`) and `~/.local/bin`; when nothing is found, `soundLab.mlx.python -m mlx_audio.server` is used."
+        },
         "soundLab.mlx.image": {
           "type": "string",
           "default": "",

@@ -50,8 +50,8 @@ CFG.mlx = {
   sttModel: nonEmpty(env.SOUND_LAB_STT_MODEL, 'mlx-community/whisper-large-v3-turbo'),
   ttsModel: nonEmpty(env.SOUND_LAB_TTS_MODEL, 'mlx-community/Kokoro-82M-bf16'),
   ttsVoice: nonEmpty(env.SOUND_LAB_TTS_VOICE, 'af_heart'),
-  binaries: { docker: CFG.container.binaries.docker, podman: CFG.container.binaries.podman, container: nonEmpty(env.SOUND_LAB_APPLE_CONTAINER, 'container'), python3: nonEmpty(env.SOUND_LAB_PYTHON, 'python3') },
-  which,
+  // 'mlx_audio.server': explicit path (setting mlx_server). Empty = PATH, then /opt/homebrew/bin, /usr/local/bin, ~/.local/bin, else python3 -m.
+  binaries: { docker: CFG.container.binaries.docker, podman: CFG.container.binaries.podman, container: nonEmpty(env.SOUND_LAB_APPLE_CONTAINER, 'container'), python3: nonEmpty(env.SOUND_LAB_PYTHON, 'python3'), 'mlx_audio.server': nonEmpty(env.SOUND_LAB_MLX_SERVER, '') },
 };
 CFG.stt = {
   backend: nonEmpty(env.SOUND_LAB_STT_BACKEND, 'auto'),
@@ -240,6 +240,7 @@ const TOOLS = [
       const c = capabilities(CFG.ffmpeg, CFG.ffprobe, !!refresh);
       const ci = containerInfo(which);
       const mlxHealth = await mlx.health();
+      const mlxServer = mlx.serverExecutable(); // what native mode would run (null = python3 -m mlx_audio.server)
       const backends = {
         'mlx-service': mlxHealth.reachable ? `ready at ${mlxHealth.url}` : `not running (mode ${CFG.mlx.mode}${CFG.mlx.autostart ? ', autostarts on demand' : ''})`,
         mlx: appleSilicon && which(CFG.stt.mlxWhisperExe) ? 'mlx_whisper CLI found' : 'not available (needs Apple Silicon + pip install mlx-whisper)',
@@ -251,6 +252,7 @@ const TOOLS = [
       if (c.appleSilicon) {
         recs.push('Apple Silicon: use runner "local" for GPU work — VideoToolbox (h264/hevc_videotoolbox), AudioToolbox (aac_at) and MLX all need the host.');
         recs.push('MLX audio service mode "native" runs on the Apple GPU (Metal). Docker and Apple `container` run Linux VMs without Metal, so MLX there is CPU-only.');
+        if (!mlxServer) { recs.push('No mlx_audio.server on PATH, /opt/homebrew/bin, /usr/local/bin or ~/.local/bin, so native mode would run "python3 -m mlx_audio.server". Install it: brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab && brew install mlx-audio (or set mlx_server).'); }
         if (ci.podman && ci.podmanProvider !== 'libkrun') { recs.push('For GPU inside containers on macOS use a podman machine with the libkrun provider (Vulkan → Metal) and container_gpu "dri" with the whisper-vulkan image.'); }
       } else if (process.platform === 'linux') {
         recs.push('Linux: MLX audio service in docker/podman with image tag :cuda12 and mlx_gpu "nvidia" uses `mlx[cuda12]` on NVIDIA GPUs; tag :cpu otherwise.');
@@ -262,7 +264,7 @@ const TOOLS = [
           keyEncoders: ['libmp3lame', 'aac', 'aac_at', 'libfdk_aac', 'alac', 'flac', 'libopus', 'libvorbis', 'libx264', 'libx265', 'h264_videotoolbox', 'hevc_videotoolbox', 'prores_videotoolbox', 'h264_nvenc'].filter(e => c.encoders.has(e)),
           keyFilters: ['loudnorm', 'sidechaincompress', 'amix', 'acrossfade', 'afftdn', 'arnndn', 'rubberband', 'whisper', 'showspectrumpic'].filter(f => c.filters.has(f)), errors: c.errors },
         containers: { ...ci, appleContainer: !!which(CFG.mlx.binaries.container) },
-        mlxService: { ...mlxHealth, mode: CFG.mlx.mode, image: CFG.mlx.mode === 'native' ? null : CFG.mlx.image, sttModel: CFG.mlx.sttModel, ttsModel: CFG.mlx.ttsModel },
+        mlxService: { ...mlxHealth, mode: CFG.mlx.mode, server: mlxServer, image: CFG.mlx.mode === 'native' ? null : CFG.mlx.image, sttModel: CFG.mlx.sttModel, ttsModel: CFG.mlx.ttsModel },
         speechToText: { configured: CFG.stt.backend, backends },
         config: { runner: CFG.container.runner, image: CFG.container.image, gpu: CFG.container.gpu, maxConcurrency: CFG.maxConcurrency, dataDir: CFG.dataDir, outputDir: CFG.outputDir || '(next to inputs)' },
         recommendations: recs,
@@ -440,7 +442,7 @@ const TOOLS = [
   },
   {
     name: 'mlx_service',
-    description: 'Manage the MLX audio inference service (mlx-audio server: STT, TTS, separation). Modes: native (host Python, Apple GPU/Metal), docker | podman (Linux image; :cuda12 uses mlx[cuda12] on NVIDIA, :cpu otherwise), apple-container (Apple `container` CLI, CPU), external (already running at url). Actions: status, start, stop, logs, plan, models.',
+    description: 'Manage the MLX audio inference service (mlx-audio server: STT, TTS, separation). Modes: native (host mlx_audio.server from Homebrew or pip — Apple GPU/Metal; found via setting mlx_server, PATH, Homebrew bin, ~/.local/bin, else python3 -m), docker | podman (Linux image; :cuda12 uses mlx[cuda12] on NVIDIA, :cpu otherwise), apple-container (Apple `container` CLI, CPU), external (already running at url). Actions: status, start, stop, logs, plan, models.',
     inputSchema: {
       type: 'object',
       properties: {

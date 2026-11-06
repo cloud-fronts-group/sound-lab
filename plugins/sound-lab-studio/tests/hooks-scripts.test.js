@@ -68,7 +68,7 @@ test('PostToolUse verify reports outputs, blocks on missing/empty/unreadable', (
   assert.ok(good);
 });
 
-test('SessionStart hook summarises the environment and unfinished jobs', () => {
+test('SessionStart hook summarises the environment, unfinished jobs, and finds mlx_audio.server off PATH', () => {
   const data = path.join(work, 'plugdata'); fs.mkdirSync(path.join(data, 'jobs'), { recursive: true });
   fs.writeFileSync(path.join(data, 'jobs', 'convert-x.json'), JSON.stringify({ id: 'convert-x', status: 'interrupted', items: [] }));
   const out = hook('session-start.js', { hook_event_name: 'SessionStart' }, { CLAUDE_PLUGIN_DATA: data });
@@ -76,6 +76,16 @@ test('SessionStart hook summarises the environment and unfinished jobs', () => {
   assert.equal(out.hookSpecificOutput.hookEventName, 'SessionStart');
   assert.match(ctx, /ffmpeg \d/);
   assert.match(ctx, /convert-x \(interrupted\)/);
+  // With a minimal PATH (hooks, VS Code) a Homebrew mlx_audio.server is still reported: the hook searches the same well-known
+  // bin directories as the MCP server (SOUND_LAB_BIN_DIRS pins them for the test).
+  const brewBin = path.join(work, 'brew-bin'); fs.mkdirSync(brewBin, { recursive: true });
+  fs.writeFileSync(path.join(brewBin, 'mlx_audio.server'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const emptyBin = path.join(work, 'empty-bin'); fs.mkdirSync(emptyBin, { recursive: true });
+  const minimal = hook('session-start.js', { hook_event_name: 'SessionStart' }, { CLAUDE_PLUGIN_DATA: data, PATH: emptyBin, SOUND_LAB_BIN_DIRS: brewBin }).hookSpecificOutput.additionalContext;
+  assert.match(minimal, /ffmpeg NOT found/);
+  assert.ok(minimal.includes(`tools: mlx_audio.server (${brewBin}, not on PATH)`), minimal);
+  const none = hook('session-start.js', { hook_event_name: 'SessionStart' }, { CLAUDE_PLUGIN_DATA: data, PATH: emptyBin, SOUND_LAB_BIN_DIRS: '' }).hookSpecificOutput.additionalContext;
+  assert.doesNotMatch(none, /mlx_audio\.server/);
 });
 
 test('dub.js music: full-length mix, voice offset, measurable ducking, loudness target', () => {

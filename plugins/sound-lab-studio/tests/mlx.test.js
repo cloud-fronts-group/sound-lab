@@ -9,15 +9,21 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const net = require('net');
+const os = require('os');
 const path = require('path');
 const { McpClient, tmpdir, tone, info, FIX_BIN } = require('./helpers');
 const { normalizeTranscript } = require('../mcp/lib/mlx');
+const { which, findExecutable, wellKnownBinDirs, WELL_KNOWN_BIN_DIRS } = require('../mcp/lib/ff');
 
 const work = tmpdir('slmlx-');
 const state = path.join(work, 'containers');
 const freePort = () => new Promise(r => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
 const calls = () => fs.readFileSync(path.join(state, 'calls.log'), 'utf8').trim().split('\n').map(JSON.parse);
 const reqLog = () => fs.readFileSync(path.join(work, 'mlx-requests.log'), 'utf8').trim().split('\n').map(JSON.parse);
+const fakeExe = (dir, name) => { fs.mkdirSync(dir, { recursive: true }); const p = path.join(dir, name); fs.writeFileSync(p, '#!/bin/sh\nexit 0\n', { mode: 0o755 }); return p; };
+const emptyBin = () => { const d = path.join(work, 'bin-empty'); fs.mkdirSync(d, { recursive: true }); return d; };
+// Absolute ffmpeg/ffprobe so the capabilities tool keeps working when a test gives the server an empty PATH.
+const ffEnv = { SOUND_LAB_FFMPEG: which('ffmpeg') || 'ffmpeg', SOUND_LAB_FFPROBE: which('ffprobe') || 'ffprobe' };
 
 async function client(mode, extra = {}) {
   const port = await freePort();
@@ -121,6 +127,58 @@ test('external mode never starts anything and explains itself; auto backend skip
   assert.equal(j.language, 'de');
   assert.match(j.segments[1].text, /whisper-large-v3-turbo/);
   await c.close();
+});
+
+test('findExecutable: explicit setting as given, then PATH, then the well-known directories in order', () => {
+  assert.deepEqual(WELL_KNOWN_BIN_DIRS, ['/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin')]);
+  assert.deepEqual(wellKnownBinDirs(['/a', '/b'].join(path.delimiter)), ['/a', '/b']);
+  assert.deepEqual(wellKnownBinDirs(''), [], 'SOUND_LAB_BIN_DIRS="" disables the well-known directories');
+  const empty = emptyBin();
+  const first = fakeExe(path.join(work, 'bin-first'), 'sl-fake-tool');
+  const second = fakeExe(path.join(work, 'bin-second'), 'sl-fake-tool');
+  const dirs = [empty, path.dirname(first), path.dirname(second)];
+  const savedPath = process.env.PATH;
+  try {
+    process.env.PATH = empty;
+    assert.equal(findExecutable('sl-fake-tool', undefined, dirs), first, 'the first well-known directory that has it');
+    assert.equal(findExecutable('sl-fake-tool', '', [path.dirname(second)]), second);
+    assert.equal(findExecutable('sl-fake-tool', undefined, [empty]), null, 'nothing found → null, the caller keeps its fallback');
+    assert.equal(findExecutable('sl-fake-tool', '/explicit/mlx_audio.server', dirs), '/explicit/mlx_audio.server', 'an explicit setting wins as given');
+    const onPath = fakeExe(path.join(work, 'bin-path'), 'sl-fake-tool');
+    process.env.PATH = path.dirname(onPath);
+    assert.equal(findExecutable('sl-fake-tool', undefined, dirs), onPath, 'PATH beats the well-known directories');
+  } finally { process.env.PATH = savedPath; }
+});
+
+test('native mode: plan runs mlx_server, else mlx_audio.server from PATH or the Homebrew/user bin dirs, else python -m', async () => {
+  const empty = emptyBin();
+  // 1. explicit setting (SOUND_LAB_MLX_SERVER ← user_config mlx_server) wins
+  const explicit = fakeExe(path.join(work, 'bin-explicit'), 'mlx_audio.server');
+  { const { c, port } = await client('native', { SOUND_LAB_MLX_SERVER: explicit, PATH: empty, SOUND_LAB_BIN_DIRS: '', ...ffEnv });
+    const plan = await c.call('mlx_service', { action: 'plan' });
+    assert.equal(plan.mode, 'native');
+    assert.equal(plan.command, `${explicit} --host 127.0.0.1 --port ${port}`);
+    assert.equal(plan.url, `http://127.0.0.1:${port}`);
+    assert.equal((await c.call('capabilities')).mlxService.server, explicit);
+    await c.close(); }
+  // 2. minimal PATH (VS Code's extension host, launchd, a conda env in front) → the well-known directories, first hit wins
+  const brew = fakeExe(path.join(work, 'bin-homebrew'), 'mlx_audio.server');
+  const user = fakeExe(path.join(work, 'bin-user'), 'mlx_audio.server');
+  { const { c, port } = await client('native', { PATH: empty, SOUND_LAB_BIN_DIRS: [empty, path.dirname(brew), path.dirname(user)].join(path.delimiter), ...ffEnv });
+    assert.equal((await c.call('mlx_service', { action: 'plan' })).command, `${brew} --host 127.0.0.1 --port ${port}`);
+    assert.equal((await c.call('capabilities')).mlxService.server, brew);
+    await c.close(); }
+  // 3. nothing anywhere → "<python3> -m mlx_audio.server"; capabilities says so; start fails fast with an install hint
+  const py = path.join(work, 'venv', 'bin', 'python3');
+  { const { c, port } = await client('native', { PATH: empty, SOUND_LAB_BIN_DIRS: '', SOUND_LAB_PYTHON: py, ...ffEnv });
+    assert.equal((await c.call('mlx_service', { action: 'plan' })).command, `${py} -m mlx_audio.server --host 127.0.0.1 --port ${port}`);
+    const caps = await c.call('capabilities');
+    assert.equal(caps.mlxService.server, null);
+    if (caps.host.appleSilicon) { assert.ok(caps.recommendations.some(r => /brew install mlx-audio/.test(r)), JSON.stringify(caps.recommendations)); }
+    const t0 = Date.now();
+    await assert.rejects(c.call('mlx_service', { action: 'start' }), /python3 not found \(native mode would run: .* -m mlx_audio\.server .*brew install mlx-audio/s);
+    assert.ok(Date.now() - t0 < 15000, 'did not wait for the ready timeout');
+    await c.close(); }
 });
 
 test('native mode: fails fast with a CUDA hint when mlx[cuda12] has no GPU (real wheel, optional)', { skip: !process.env.SOUND_LAB_TEST_CUDA_PYTHON }, async () => {

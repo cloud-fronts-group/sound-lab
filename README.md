@@ -38,14 +38,25 @@ Opening any audio file (wav, mp3, flac, ogg, opus, m4a, aiff, wma, caf…) shows
 Keyboard shortcuts: `Space` play/pause · `L` loop · `E` export · `Z` zoom to selection · `0` fit · `+`/`-` zoom · `←`/`→` seek 1 s (5 s with Shift) · `Esc` clear selection.
 
 ### mlx-audio: local speech AI inside VS Code
-Sound Lab connects to the **[mlx-audio](https://github.com/Blaizzy/mlx-audio) API server** (`mlx_audio.server`) and can start and stop it for you:
+Sound Lab connects to the **[mlx-audio](https://github.com/Blaizzy/mlx-audio) API server** (`mlx_audio.server`) and can start and stop it for you.
+
+**Install with Homebrew (Apple Silicon)**
+```bash
+brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab
+brew install mlx-audio            # mlx_audio.server with Metal (MLX) - the native mode server
+brew install mlx-audio-studio     # optional: the prebuilt Studio web UI (mlx-audio-studio launcher)
+brew services start mlx-audio     # optional: keep the API server running at http://127.0.0.1:8000
+```
+Native mode looks for `mlx_audio.server` on your `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin` and `~/.local/bin`, and only falls back to `soundLab.mlx.python -m mlx_audio.server` when none of them has it. The setting `soundLab.mlx.server` pins a specific binary, which helps when a conda or venv on your `PATH` shadows the Homebrew one. The Studio from Homebrew is prebuilt for the API at `http://localhost:8000`, so with a different `soundLab.mlx.port` Sound Lab falls back to downloading the Studio and running it in dev mode.
 
 | `soundLab.mlx.mode` | Runs | GPU |
 |---|---|---|
-| `auto` → `native` on Apple Silicon | `python -m mlx_audio.server` on your Mac (`pip install "mlx-audio[server]"`) | **Apple GPU (Metal)** |
+| `auto` → `native` on Apple Silicon | `mlx_audio.server` from Homebrew, or `python -m mlx_audio.server` (`pip install "mlx-audio[server]"`), on your Mac | **Apple GPU (Metal)** |
 | `docker` / `podman` + `soundLab.mlx.gpu: nvidia` | `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cuda12` (`pip install mlx[cuda12]`) | **NVIDIA CUDA 12** |
 | `docker` / `podman` / `apple-container` | `…:cpu` image (`mlx[cpu]`) | CPU (containers on macOS cannot reach Metal) |
 | `external` | any server at `soundLab.mlx.url` | wherever it runs |
+
+Containers (Docker, Podman, Apple `container`) on macOS never reach the Apple GPU, because the Linux VM they run in has no Metal. On a Mac, use `native`.
 
 - **Status bar** (`MLX · n`): server state and loaded models. Click it for start/stop, Studio, models, voice clone and the log.
 - **MLX Audio panel** (Sound Lab sidebar):
@@ -53,8 +64,8 @@ Sound Lab connects to the **[mlx-audio](https://github.com/Blaizzy/mlx-audio) AP
   - transcription and source separation;
   - your cloned voices.
 - **mlx-audio Studio, embedded**: *Sound Lab: Open mlx-audio Studio* opens the mlx-audio web UI in an editor tab, with its pages for text to speech, speech to text and separation.
-  - Studio isn't in the pip wheel, so Sound Lab finds it in an editable install, or downloads `mlx_audio/ui` from GitHub.
-  - It runs `next dev` pointed at the managed API server.
+  - Studio isn't in the pip wheel, so Sound Lab uses the prebuilt Homebrew `mlx-audio-studio` bundle when its baked-in API URL matches, else finds it in an editable install, or downloads `mlx_audio/ui` from GitHub.
+  - The Homebrew bundle runs through its `mlx-audio-studio` launcher (no `npm install`); a checkout runs `next dev` pointed at the managed API server.
   - It works over Remote-SSH and Codespaces through VS Code port forwarding.
 - **Transcription backend `mlx-audio`**: MLX Whisper or Parakeet through the same server, including the audio editor's Transcript panel.
 - **Models**: load or unload them from a quick pick, or from the editor context menu (*Text to Speech* on a selection).

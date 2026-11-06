@@ -138,7 +138,16 @@ node_modules/**
 CLAUDE.md
 .gitignore
 docs/**
+media/icons/library/**
+plugins/**
+.claude-plugin/**
+.github/**
+scripts/**
+Formula/**
+notebooks/**
 ```
+
+`Formula/**` (the Homebrew tap) and `notebooks/**` (Colab notebooks) are excluded as well: neither is part of the extension.
 
 The package is **21 files, 146 KB**: `package.json`, the README, LICENSE and CHANGELOG, the compiled `out/` JavaScript, and `media/`. `docs/**` is excluded on purpose: with the screenshots, `docs/` would add 6 files and push the VSIX from 146 KB to about 1.9 MB.
 
@@ -153,13 +162,31 @@ The release flow is the `/release` skill:
 
 Publishing to the Marketplace is deliberately not part of it: `.claude/settings.json` denies `vsce publish`, because it needs your publisher token.
 
+## Homebrew tap
+
+The native mlx-audio server and the prebuilt Studio are installed with Homebrew, and this repository is the tap: the formulae are `Formula/mlx-audio.rb` and `Formula/mlx-audio-studio.rb`, and users run `brew tap cloud-fronts-group/sound-lab https://github.com/cloud-fronts-group/sound-lab`. Neither formula is part of the VSIX.
+
+To test a formula change before it is pushed, build it from a local tap that has no remote:
+
+```bash
+brew tap-new cloud-fronts-group/sound-lab      # a local tap (untap the real one first if it is installed)
+cp Formula/*.rb "$(brew --repository cloud-fronts-group/sound-lab)/Formula/"
+brew install cloud-fronts-group/sound-lab/mlx-audio
+brew test cloud-fronts-group/sound-lab/mlx-audio
+brew audit --strict cloud-fronts-group/sound-lab/mlx-audio
+```
+
+Repeat the last three lines for `mlx-audio-studio`. `brew services start mlx-audio` then runs `mlx_audio.server` on `127.0.0.1:8000` and logs to `$(brew --prefix)/var/log/mlx-audio.log`; `brew services start mlx-audio-studio` runs the Studio launcher on `127.0.0.1:3000`. When mlx-audio publishes a release, bump the version and the `sha256` of the source archive in `Formula/mlx-audio.rb` (`shasum -a 256` on the downloaded file), rebuild, and run `brew test` and `brew audit --strict` again.
+
 ## Repository layout
 
 ```text
 .claude/            Claude Code project setup: settings, hook, skills, agents
 .vscode/            launch.json (F5), tasks.json, extensions.json
 docs/               this documentation (excluded from the VSIX)
+Formula/            Homebrew tap: mlx-audio.rb, mlx-audio-studio.rb (excluded from the VSIX)
 media/              editor.js, editor.css, icon.png, activity.svg
+notebooks/          Colab notebooks (excluded from the VSIX)
 src/                extension.ts, commands.ts, util.ts, audioEditor.ts, sampleExplorer.ts, core/*.ts
 test/               core.test.js, activation.test.js, ui/harness.js
 .gitignore  .vscodeignore  CHANGELOG.md  CLAUDE.md  LICENSE  README.md  package.json  package-lock.json  tsconfig.json

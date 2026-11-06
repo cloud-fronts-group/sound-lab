@@ -5,9 +5,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { which, findExecutable } = require(path.join(__dirname, '..', '..', 'mcp', 'lib', 'ff'));
 
 const sh = (c, a) => { try { return spawnSync(c, a, { encoding: 'utf8', timeout: 4000 }); } catch { return { status: -1, stdout: '' }; } };
-const has = c => { const r = sh(process.platform === 'win32' ? 'where' : 'which', [c]); return r.status === 0; };
 const facts = [];
 const v = sh('ffmpeg', ['-hide_banner', '-version']);
 if (v.status === 0) {
@@ -20,7 +20,13 @@ if (v.status === 0) {
 } else { facts.push('ffmpeg NOT found (brew install ffmpeg / apt install ffmpeg)'); }
 const apple = process.platform === 'darwin' && process.arch === 'arm64';
 facts.push(apple ? 'Apple Silicon (Metal/MLX available natively; containers have no Metal)' : `${process.platform}/${process.arch}`);
-const tools = ['mlx_whisper', 'mlx_audio.server', 'whisper-cli', 'docker', 'podman', 'container'].filter(has);
+// Tools on PATH, or in the well-known bin directories the MCP server searches too (Homebrew's mlx_audio.server, Docker Desktop's
+// docker in /usr/local/bin…), because hooks and VS Code often run with a minimal PATH.
+const tools = [];
+for (const t of ['mlx_whisper', 'mlx_audio.server', 'whisper-cli', 'docker', 'podman', 'container']) {
+  const exe = findExecutable(t);
+  if (exe) { tools.push(which(t) ? t : `${t} (${path.dirname(exe)}, not on PATH)`); }
+}
 if (tools.length) { facts.push(`tools: ${tools.join(', ')}`); }
 // running background jobs from the MCP server
 const dataDir = process.env.CLAUDE_PLUGIN_DATA || process.env.SOUND_LAB_DATA || path.join(os.homedir(), '.sound-lab');

@@ -2,6 +2,7 @@
 // Process helpers for ffmpeg / ffprobe and other CLIs. No dependencies.
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 /** Parse "HH:MM:SS.ms", "MM:SS" or seconds. */
@@ -78,6 +79,33 @@ function which(cmd) {
   return null;
 }
 
+/**
+ * Directories searched after PATH for native tools, in this order: Homebrew's bin (Apple silicon, then Intel), then
+ * pipx / uv user installs. VS Code's extension host, launchd-started services and Claude Code hooks often run with a
+ * minimal PATH, and an auto-activated conda env can shadow the Homebrew binary. The environment variable
+ * SOUND_LAB_BIN_DIRS (a PATH-style list, may be empty) replaces the list; tests use it to pin discovery.
+ */
+const WELL_KNOWN_BIN_DIRS = ['/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin')];
+function wellKnownBinDirs(override = process.env.SOUND_LAB_BIN_DIRS) {
+  return override === undefined ? WELL_KNOWN_BIN_DIRS : String(override).split(path.delimiter).filter(Boolean);
+}
+
+/**
+ * The executable native mode runs: `explicit` (a setting) wins as given, then `name` on PATH, then `name` in the
+ * well-known directories in order. Returns a path, or null when nothing was found so the caller keeps its fallback
+ * (e.g. `python3 -m mlx_audio.server`).
+ */
+function findExecutable(name, explicit, dirs = wellKnownBinDirs()) {
+  if (explicit) { return explicit; }
+  const onPath = which(name);
+  if (onPath) { return onPath; }
+  for (const dir of dirs) {
+    const p = path.join(dir, name);
+    try { if (fs.statSync(p).isFile()) { return p; } } catch { /* next */ }
+  }
+  return null;
+}
+
 async function probe(ffprobe, file) {
   const r = await run(ffprobe, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', file]);
   if (r.code !== 0) { throw new Error(`ffprobe failed for ${file}: ${tail(r.stderr, 3)}`); }
@@ -119,4 +147,4 @@ function capabilities(ffmpeg, ffprobe, refresh = false) {
   return caps;
 }
 
-module.exports = { run, tail, which, probe, capabilities, parseTime };
+module.exports = { run, tail, which, findExecutable, wellKnownBinDirs, WELL_KNOWN_BIN_DIRS, probe, capabilities, parseTime };
