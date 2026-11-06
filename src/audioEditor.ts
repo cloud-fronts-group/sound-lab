@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { icon, iconSprite } from './icons';
+import { deckSvg, stageSvg } from './stage';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -110,7 +112,9 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
       }
       case 'run': {
         const id = String(m.command);
-        if (/^[a-zA-Z]+$/.test(id)) { await vscode.commands.executeCommand(`soundLab.${id}`, uri); }
+        // DJ moves act at the playhead (the editor sends its current time)
+        if (/^dj[A-Z][a-zA-Z]+$/.test(id) && typeof m.at === 'number' && m.at > 0) { await vscode.commands.executeCommand(`soundLab.${id}`, uri, { at: m.at }); }
+        else if (/^[a-zA-Z]+$/.test(id)) { await vscode.commands.executeCommand(`soundLab.${id}`, uri); }
         break;
       }
       case 'analyze': {
@@ -164,6 +168,7 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
 <title>${esc(title)}</title>
 </head>
 <body>
+  ${iconSprite()}
   <header>
     <h1 id="title">${esc(title)}</h1>
     <div id="chips" class="chips"></div>
@@ -171,45 +176,81 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
 
   <div id="error" class="error" hidden></div>
 
-  <section class="wave-wrap">
+  <section class="stage">${stageSvg()}</section>
+
+  <section class="wave-wrap screen">
     <canvas id="wave" tabindex="0" aria-label="Waveform. Drag to select, click to seek, scroll to zoom."></canvas>
     <div id="loading" class="loading">Decoding waveform…</div>
   </section>
 
-  <div class="transport">
-    <button id="play" class="primary" title="Play / pause (Space)">▶</button>
-    <button id="stop" title="Stop (Home)">■</button>
-    <button id="loop" class="toggle" title="Loop selection (L)">⟲ Loop</button>
-    <span class="time"><span id="pos">0:00.000</span> / <span id="dur">0:00.000</span></span>
-    <span class="sel" id="selInfo">No selection — drag on the waveform</span>
-    <span class="spacer"></span>
-    <label title="Playback rate">Rate
-      <select id="rate"><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select>
-    </label>
-    <label title="Volume">Vol <input id="vol" type="range" min="0" max="1" step="0.01" value="0.9"></label>
-    <button id="zoomOut" title="Zoom out (-)">−</button>
-    <button id="zoomFit" title="Fit (0)">Fit</button>
-    <button id="zoomIn" title="Zoom in (+)">+</button>
-  </div>
+  <section class="booth">
+    <div class="deck deck-a" id="deckA">
+      ${deckSvg('A')}
+      <div class="deck-cap"><b>Deck A</b><span>Full track</span></div>
+    </div>
+
+    <div class="mixer">
+      <div class="lcd" aria-label="Playback position"><span id="pos">0:00.000</span><span class="of">/ <span id="dur">0:00.000</span></span></div>
+      <div class="transport">
+        <button id="play" class="primary" title="Play / pause (Space)" aria-label="Play / pause">${icon('play')}</button>
+        <button id="stop" title="Stop (Home)" aria-label="Stop">${icon('stop')}</button>
+        <button id="loop" class="toggle" title="Loop selection (L)">${icon('loop')}Loop</button>
+      </div>
+      <div class="faders">
+        <label class="fader" title="Volume"><span>Vol</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.9"></label>
+        <label class="pitch" title="Playback rate (pitch fader)"><span>Pitch ×</span>
+          <select id="rate"><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select>
+        </label>
+      </div>
+      <div class="zoomrow">
+        <button id="zoomOut" title="Zoom out (-)" aria-label="Zoom out">${icon('zoom-out')}</button>
+        <button id="zoomFit" title="Fit (0)">${icon('zoom-fit')}Fit</button>
+        <button id="zoomIn" title="Zoom in (+)" aria-label="Zoom in">${icon('zoom-in')}</button>
+      </div>
+    </div>
+
+    <div class="deck deck-b" id="deckB">
+      ${deckSvg('B')}
+      <div class="deck-cap"><b>Deck B</b><span class="sel" id="selInfo">No selection — drag on the waveform</span></div>
+    </div>
+  </section>
 
   <div class="actions">
-    <button id="export" class="primary" disabled title="Save the selection as a new sample (E)">⤓ Export selection</button>
-    <button id="zoomSel" disabled title="Zoom to selection (Z)">Zoom to selection</button>
-    <button data-panel="levels">Levels</button>
-    <button data-panel="spectrogram">Spectrogram</button>
-    <button data-panel="silence">Find silence</button>
-    <button data-panel="transcript">Transcript</button>
+    <button id="export" class="primary" disabled title="Save the selection as a new sample (E)">${icon('export')}Export selection</button>
+    <button id="zoomSel" disabled title="Zoom to selection (Z)">${icon('zoom-selection')}Zoom to selection</button>
+    <button data-panel="levels">${icon('levels')}Levels</button>
+    <button data-panel="spectrogram">${icon('spectrogram')}Spectrogram</button>
+    <button data-panel="silence">${icon('find-silence')}Find silence</button>
+    <button data-panel="transcript">${icon('transcribe')}Transcript</button>
     <span class="spacer"></span>
-    <button data-run="applyEffects">Effects…</button>
-    <button data-run="normalize">Normalize…</button>
-    <button data-run="convert">Convert…</button>
-    <button data-run="sliceEqual">Slice…</button>
-    <button data-run="splitOnSilence">Split on silence…</button>
-    <button data-run="probe">Info</button>
+    <button data-run="applyEffects">${icon('effects')}Effects…</button>
+    <button data-run="normalize">${icon('normalize')}Normalize…</button>
+    <button data-run="convert">${icon('convert')}Convert…</button>
+    <button data-run="sliceEqual">${icon('slice-equal')}Slice…</button>
+    <button data-run="splitOnSilence">${icon('split-silence')}Split on silence…</button>
+    <button data-run="mlxSeparate" title="Split into a sound (e.g. speech) and the rest with mlx-audio">${icon('separate')}Separate…</button>
+    <button data-run="voiceClone" title="Record your voice and narrate with it">${icon('voice-clone')}Voice clone</button>
+    <button data-run="probe">${icon('info')}Info</button>
+  </div>
+  <div class="actions dj">
+    <span class="dj-label">DJ · at the playhead</span>
+    <button data-run="djBackspin" title="Spin the track backward to a stop at the playhead">${icon('backspin')}Backspin</button>
+    <button data-run="djEchoOut" title="Echo out from the bar at the playhead">${icon('echo-out')}Echo out</button>
+    <button data-run="djBeatJump" title="Jump N beats from the playhead">${icon('beat-jump')}Beat jump…</button>
+    <button data-run="djQuickMix" title="Quick mix into another track">${icon('quick-mix')}Quick mix…</button>
+    <button data-run="djLongBlend" title="Long blend into another track">${icon('long-blend')}Long blend…</button>
+    <button data-run="djDoubleDrop" title="Line up another track's drop with this one">${icon('double-drop')}Double drop…</button>
+    <button data-run="djMashup" title="These vocals over another song's instrumental">${icon('mashup')}Mashup…</button>
+    <button data-run="djAcapella" title="Isolate the vocals">${icon('acapella')}Acapella</button>
+    <button data-run="djInstrumental" title="Remove the vocals">${icon('no-vocals')}Instrumental</button>
+    <span class="spacer"></span>
+    <button data-run="autoTune" title="Pitch-correct this vocal">${icon('autotune')}Auto-tune…</button>
+    <button data-run="detectTempoKey" title="Detect tempo and key">${icon('detect')}Tempo & key</button>
+    <button data-run="openStudio" title="Open Sound Lab Studio">${icon('studio')}Studio</button>
   </div>
 
   <section id="panel-levels" class="panel" hidden>
-    <h2>Levels <button class="link" id="levelsRefresh">re-measure</button></h2>
+    <h2>Levels <button class="link" id="levelsRefresh">${icon('refresh')}re-measure</button></h2>
     <div id="levelsBody" class="muted">Measuring…</div>
   </section>
 
@@ -226,8 +267,8 @@ export class AudioEditorProvider implements vscode.CustomReadonlyEditorProvider 
   <section id="panel-transcript" class="panel" hidden>
     <h2>Transcript
       <input id="tsearch" type="search" placeholder="Filter…">
-      <button class="link" id="tcopy">copy text</button>
-      <button class="link" id="trun">transcribe again</button>
+      <button class="link" id="tcopy">${icon('copy')}copy text</button>
+      <button class="link" id="trun">${icon('transcribe')}transcribe again</button>
     </h2>
     <div id="transcriptBody" class="muted">No transcript yet.</div>
   </section>

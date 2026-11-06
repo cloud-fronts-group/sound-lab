@@ -5,6 +5,14 @@
   "version": "0.1.0",
   "publisher": "sound-lab",
   "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloud-fronts-group/sound-lab.git"
+  },
+  "homepage": "https://github.com/cloud-fronts-group/sound-lab#readme",
+  "bugs": {
+    "url": "https://github.com/cloud-fronts-group/sound-lab/issues"
+  },
   "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.85.0"
@@ -44,6 +52,12 @@
           "id": "soundLab.samples",
           "name": "Samples",
           "icon": "media/activity.svg"
+        },
+        {
+          "type": "webview",
+          "id": "soundLab.mlxPanel",
+          "name": "MLX Audio",
+          "icon": "media/activity.svg"
         }
       ]
     },
@@ -70,133 +84,452 @@
         "command": "soundLab.openPreview",
         "title": "Open in Audio Editor",
         "category": "Sound Lab",
-        "icon": "$(play-circle)"
+        "icon": {
+          "light": "media/icons/open-editor-light.svg",
+          "dark": "media/icons/open-editor-dark.svg"
+        }
       },
       {
         "command": "soundLab.probe",
         "title": "Show Media Info (ffprobe)",
         "category": "Sound Lab",
-        "icon": "$(info)"
+        "icon": {
+          "light": "media/icons/info-light.svg",
+          "dark": "media/icons/info-dark.svg"
+        }
       },
       {
         "command": "soundLab.convert",
         "title": "Convert Format…",
         "category": "Sound Lab",
-        "icon": "$(arrow-swap)"
+        "icon": {
+          "light": "media/icons/convert-light.svg",
+          "dark": "media/icons/convert-dark.svg"
+        }
       },
       {
         "command": "soundLab.batchConvert",
         "title": "Batch Convert Folder…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/batch-convert-light.svg",
+          "dark": "media/icons/batch-convert-dark.svg"
+        }
       },
       {
         "command": "soundLab.trim",
         "title": "Trim / Cut Sample…",
         "category": "Sound Lab",
-        "icon": "$(split-horizontal)"
+        "icon": {
+          "light": "media/icons/trim-light.svg",
+          "dark": "media/icons/trim-dark.svg"
+        }
       },
       {
         "command": "soundLab.normalize",
         "title": "Normalize Loudness…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/normalize-light.svg",
+          "dark": "media/icons/normalize-dark.svg"
+        }
       },
       {
         "command": "soundLab.extractAudio",
         "title": "Extract Audio from Video…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/extract-audio-light.svg",
+          "dark": "media/icons/extract-audio-dark.svg"
+        }
       },
       {
         "command": "soundLab.sliceEqual",
         "title": "Slice into Equal Chunks…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/slice-equal-light.svg",
+          "dark": "media/icons/slice-equal-dark.svg"
+        }
       },
       {
         "command": "soundLab.splitOnSilence",
         "title": "Split on Silence…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/split-silence-light.svg",
+          "dark": "media/icons/split-silence-dark.svg"
+        }
       },
       {
         "command": "soundLab.applyEffects",
         "title": "Apply Effects / Filter Chain…",
         "category": "Sound Lab",
-        "icon": "$(wand)"
+        "icon": {
+          "light": "media/icons/effects-light.svg",
+          "dark": "media/icons/effects-dark.svg"
+        }
       },
       {
         "command": "soundLab.waveformImage",
         "title": "Render Waveform Image",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/waveform-image-light.svg",
+          "dark": "media/icons/waveform-image-dark.svg"
+        }
       },
       {
         "command": "soundLab.spectrogramImage",
         "title": "Render Spectrogram Image",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/spectrogram-light.svg",
+          "dark": "media/icons/spectrogram-dark.svg"
+        }
       },
       {
         "command": "soundLab.analyze",
         "title": "Analyze Loudness & Levels",
         "category": "Sound Lab",
-        "icon": "$(graph)"
+        "icon": {
+          "light": "media/icons/levels-light.svg",
+          "dark": "media/icons/levels-dark.svg"
+        }
       },
       {
         "command": "soundLab.transcribe",
         "title": "Transcribe Audio…",
         "category": "Sound Lab",
-        "icon": "$(comment-discussion)"
+        "icon": {
+          "light": "media/icons/transcribe-light.svg",
+          "dark": "media/icons/transcribe-dark.svg"
+        }
       },
       {
         "command": "soundLab.setApiKey",
         "title": "Set Transcription API Key",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/key-light.svg",
+          "dark": "media/icons/key-dark.svg"
+        }
       },
       {
         "command": "soundLab.record",
         "title": "Record Sample from Microphone…",
         "category": "Sound Lab",
-        "icon": "$(record)"
+        "icon": {
+          "light": "media/icons/record-light.svg",
+          "dark": "media/icons/record-dark.svg"
+        }
       },
       {
         "command": "soundLab.generateTone",
         "title": "Generate Tone / Noise…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/tone-light.svg",
+          "dark": "media/icons/tone-dark.svg"
+        }
       },
       {
         "command": "soundLab.concat",
         "title": "Concatenate Files…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/combine-light.svg",
+          "dark": "media/icons/combine-dark.svg"
+        }
       },
       {
         "command": "soundLab.muxSubtitles",
         "title": "Add Subtitles to Video…",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/subtitles-light.svg",
+          "dark": "media/icons/subtitles-dark.svg"
+        }
       },
       {
         "command": "soundLab.recipes",
         "title": "FFmpeg Recipes (open in terminal)…",
         "category": "Sound Lab",
-        "icon": "$(terminal)"
+        "icon": {
+          "light": "media/icons/terminal-light.svg",
+          "dark": "media/icons/terminal-dark.svg"
+        }
       },
       {
         "command": "soundLab.showCapabilities",
         "title": "Show FFmpeg Capabilities",
-        "category": "Sound Lab"
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/capabilities-light.svg",
+          "dark": "media/icons/capabilities-dark.svg"
+        }
       },
       {
         "command": "soundLab.showLog",
         "title": "Show FFmpeg Log",
         "category": "Sound Lab",
-        "icon": "$(output)"
+        "icon": {
+          "light": "media/icons/log-light.svg",
+          "dark": "media/icons/log-dark.svg"
+        }
       },
       {
         "command": "soundLab.refreshSamples",
         "title": "Refresh Samples",
         "category": "Sound Lab",
-        "icon": "$(refresh)"
+        "icon": {
+          "light": "media/icons/refresh-light.svg",
+          "dark": "media/icons/refresh-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.voiceClone",
+        "title": "Voice Clone (record your voice, then narrate)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/voice-clone-light.svg",
+          "dark": "media/icons/voice-clone-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStart",
+        "title": "Start mlx-audio Server",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-light.svg",
+          "dark": "media/icons/server-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStop",
+        "title": "Stop mlx-audio Server",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-stop-light.svg",
+          "dark": "media/icons/server-stop-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStatus",
+        "title": "mlx-audio Server Status & Actions",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-light.svg",
+          "dark": "media/icons/server-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxModels",
+        "title": "mlx-audio Models (load / unload)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/model-light.svg",
+          "dark": "media/icons/model-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxSynthesize",
+        "title": "Text to Speech (mlx-audio)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/speak-light.svg",
+          "dark": "media/icons/speak-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxSeparate",
+        "title": "Separate Sources (mlx-audio)…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/separate-light.svg",
+          "dark": "media/icons/separate-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxOpenStudio",
+        "title": "Open mlx-audio Studio (in Sound Lab Studio)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/studio-light.svg",
+          "dark": "media/icons/studio-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.mlxStopStudio",
+        "title": "Stop mlx-audio Studio",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/server-stop-light.svg",
+          "dark": "media/icons/server-stop-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.openStudio",
+        "title": "Open Sound Lab Studio",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/studio-light.svg",
+          "dark": "media/icons/studio-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addInstrumental",
+        "title": "Studio: Add Instrumental…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/instrumental-light.svg",
+          "dark": "media/icons/instrumental-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addBeats",
+        "title": "Studio: Add Beats…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/beats-light.svg",
+          "dark": "media/icons/beats-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addChords",
+        "title": "Studio: Add Chords…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/chords-light.svg",
+          "dark": "media/icons/chords-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.addSoundFx",
+        "title": "Studio: Add Sound FX…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/sfx-light.svg",
+          "dark": "media/icons/sfx-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.layerOnto",
+        "title": "Studio: Layer a Part onto This Track…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/layers-light.svg",
+          "dark": "media/icons/layers-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.autoTune",
+        "title": "Auto-tune Vocals…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/autotune-light.svg",
+          "dark": "media/icons/autotune-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.detectTempoKey",
+        "title": "Detect Tempo & Key",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/detect-light.svg",
+          "dark": "media/icons/detect-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djBackspin",
+        "title": "DJ: Backspin",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/backspin-light.svg",
+          "dark": "media/icons/backspin-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djEchoOut",
+        "title": "DJ: Echo Out",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/echo-out-light.svg",
+          "dark": "media/icons/echo-out-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djBeatJump",
+        "title": "DJ: Beat Jump…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/beat-jump-light.svg",
+          "dark": "media/icons/beat-jump-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djDoubleDrop",
+        "title": "DJ: Double Drop…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/double-drop-light.svg",
+          "dark": "media/icons/double-drop-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djQuickMix",
+        "title": "DJ: Quick Mix…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/quick-mix-light.svg",
+          "dark": "media/icons/quick-mix-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djLongBlend",
+        "title": "DJ: Long Blend…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/long-blend-light.svg",
+          "dark": "media/icons/long-blend-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djMashup",
+        "title": "DJ: Mashup…",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/mashup-light.svg",
+          "dark": "media/icons/mashup-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djAcapella",
+        "title": "DJ: Acapella (isolate vocals)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/acapella-light.svg",
+          "dark": "media/icons/acapella-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.djInstrumental",
+        "title": "DJ: Instrumental (remove vocals)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/no-vocals-light.svg",
+          "dark": "media/icons/no-vocals-dark.svg"
+        }
       }
     ],
     "submenus": [
       {
         "id": "soundLab.explorerMenu",
         "label": "Sound Lab"
+      },
+      {
+        "id": "soundLab.djMenu",
+        "label": "Sound Lab DJ"
       }
     ],
     "menus": {
@@ -302,6 +635,31 @@
           "command": "soundLab.generateTone",
           "group": "7_folder@3",
           "when": "explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.mlxSeparate",
+          "group": "5_speech@3",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.autoTune",
+          "group": "6_studio@1",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.layerOnto",
+          "group": "6_studio@2",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.detectTempoKey",
+          "group": "6_studio@3",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "submenu": "soundLab.djMenu",
+          "group": "6_studio@4",
+          "when": "!explorerResourceIsFolder"
         }
       ],
       "view/title": [
@@ -344,6 +702,36 @@
           "command": "soundLab.showLog",
           "when": "view == soundLab.samples",
           "group": "more@5"
+        },
+        {
+          "command": "soundLab.voiceClone",
+          "when": "view == soundLab.mlxPanel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "soundLab.mlxOpenStudio",
+          "when": "view == soundLab.mlxPanel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "soundLab.mlxModels",
+          "when": "view == soundLab.mlxPanel",
+          "group": "navigation@3"
+        },
+        {
+          "command": "soundLab.mlxStart",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@1"
+        },
+        {
+          "command": "soundLab.mlxStop",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@2"
+        },
+        {
+          "command": "soundLab.mlxStopStudio",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@3"
         }
       ],
       "view/item/context": [
@@ -411,6 +799,21 @@
           "command": "soundLab.transcribe",
           "when": "view == soundLab.samples && viewItem == soundLab.file",
           "group": "5_speech@1"
+        },
+        {
+          "command": "soundLab.mlxSeparate",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "5_speech@2"
+        },
+        {
+          "command": "soundLab.autoTune",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "6_studio@1"
+        },
+        {
+          "submenu": "soundLab.djMenu",
+          "when": "view == soundLab.samples && viewItem == soundLab.file",
+          "group": "6_studio@2"
         }
       ],
       "editor/title": [
@@ -428,12 +831,67 @@
           "command": "soundLab.probe",
           "when": "activeCustomEditorId == soundLab.audioPreview",
           "group": "navigation@3"
+        },
+        {
+          "command": "soundLab.voiceClone",
+          "when": "activeCustomEditorId == soundLab.audioPreview",
+          "group": "navigation@4"
+        },
+        {
+          "command": "soundLab.openStudio",
+          "when": "activeCustomEditorId == soundLab.audioPreview",
+          "group": "navigation@5"
         }
       ],
       "commandPalette": [
         {
           "command": "soundLab.refreshSamples",
           "when": "false"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "soundLab.mlxSynthesize",
+          "when": "editorHasSelection",
+          "group": "9_soundlab@1"
+        }
+      ],
+      "soundLab.djMenu": [
+        {
+          "command": "soundLab.djBackspin",
+          "group": "1_fx@1"
+        },
+        {
+          "command": "soundLab.djEchoOut",
+          "group": "1_fx@2"
+        },
+        {
+          "command": "soundLab.djBeatJump",
+          "group": "1_fx@3"
+        },
+        {
+          "command": "soundLab.djQuickMix",
+          "group": "2_mix@1"
+        },
+        {
+          "command": "soundLab.djLongBlend",
+          "group": "2_mix@2"
+        },
+        {
+          "command": "soundLab.djDoubleDrop",
+          "group": "2_mix@3"
+        },
+        {
+          "command": "soundLab.djMashup",
+          "group": "2_mix@4"
+        },
+        {
+          "command": "soundLab.djAcapella",
+          "group": "3_stems@1"
+        },
+        {
+          "command": "soundLab.djInstrumental",
+          "group": "3_stems@2"
         }
       ]
     },
@@ -559,12 +1017,14 @@
           "enum": [
             "whisper.cpp",
             "openai-compatible",
-            "ffmpeg-whisper"
+            "ffmpeg-whisper",
+            "mlx-audio"
           ],
           "enumDescriptions": [
             "Local whisper.cpp CLI (whisper-cli). Private, offline, needs a ggml model file.",
             "Any OpenAI-compatible /audio/transcriptions endpoint (OpenAI, Groq, faster-whisper-server, LocalAI…).",
-            "FFmpeg 8+ built-in `whisper` audio filter (requires FFmpeg built with whisper.cpp)."
+            "FFmpeg 8+ built-in `whisper` audio filter (requires FFmpeg built with whisper.cpp).",
+            "mlx-audio server (Sound Lab manages it): MLX Whisper / Parakeet on the Apple GPU natively, or in a Docker/Podman/Apple container (mlx[cuda12] on NVIDIA, mlx[cpu] otherwise)."
           ],
           "default": "whisper.cpp",
           "description": "Speech-to-text engine."
@@ -640,6 +1100,126 @@
           "type": "string",
           "default": "whisper-1",
           "description": "Model name, e.g. whisper-1, whisper-large-v3 (Groq), Systran/faster-whisper-small."
+        },
+        "soundLab.mlx.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "native",
+            "docker",
+            "podman",
+            "apple-container",
+            "external"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "native on Apple Silicon, docker elsewhere",
+            "Host Python `mlx_audio.server` — MLX on the Apple GPU (Metal)",
+            "Docker image (:cuda12 = mlx[cuda12] on NVIDIA, :cpu otherwise)",
+            "Podman image (same tags; CDI for NVIDIA)",
+            "Apple `container` CLI (macOS 26) — CPU",
+            "An mlx-audio server you run yourself at soundLab.mlx.url"
+          ],
+          "markdownDescription": "How Sound Lab runs the **mlx-audio** API server (STT, TTS, voice cloning, separation). Containers on macOS have no Metal access, so the Apple-GPU path is `native`."
+        },
+        "soundLab.mlx.url": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Base URL of an mlx-audio server (mode `external`, or to override). Empty = `http://127.0.0.1:<port>`."
+        },
+        "soundLab.mlx.port": {
+          "type": "number",
+          "default": 8000,
+          "description": "Port of the mlx-audio API server."
+        },
+        "soundLab.mlx.python": {
+          "type": "string",
+          "default": "python3",
+          "markdownDescription": "Python with `mlx-audio[server]` installed (native mode), e.g. a venv's `bin/python`."
+        },
+        "soundLab.mlx.image": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Container image for docker/podman/apple-container. Empty = `ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:cpu` or `:cuda12` (see `soundLab.mlx.gpu`)."
+        },
+        "soundLab.mlx.gpu": {
+          "type": "string",
+          "enum": [
+            "none",
+            "nvidia"
+          ],
+          "default": "none",
+          "markdownDescription": "`nvidia` uses the `:cuda12` image (pip `mlx[cuda12]`) with GPU passthrough. Needs an NVIDIA GPU, driver ≥ 550 and the NVIDIA Container Toolkit."
+        },
+        "soundLab.mlx.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the mlx-audio server automatically when a feature needs it."
+        },
+        "soundLab.mlx.stopOnExit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Stop a natively started mlx-audio server when VS Code closes."
+        },
+        "soundLab.mlx.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the mlx-audio server status in the status bar."
+        },
+        "soundLab.mlx.sttModel": {
+          "type": "string",
+          "default": "mlx-community/whisper-large-v3-turbo",
+          "description": "Speech-to-text model for the mlx-audio backend."
+        },
+        "soundLab.mlx.ttsModel": {
+          "type": "string",
+          "default": "mlx-community/Kokoro-82M-bf16",
+          "description": "Default text-to-speech model."
+        },
+        "soundLab.mlx.ttsVoice": {
+          "type": "string",
+          "default": "af_heart",
+          "description": "Default voice for the text-to-speech model (Kokoro: af_heart, am_adam, bf_emma, bm_george…)."
+        },
+        "soundLab.mlx.cloneModel": {
+          "type": "string",
+          "default": "mlx-community/chatterbox-turbo-4bit",
+          "description": "Default voice-cloning model (must accept a reference recording: Chatterbox, Qwen3-TTS Base, CSM, Spark, OuteTTS…)."
+        },
+        "soundLab.mlx.separationModel": {
+          "type": "string",
+          "default": "",
+          "description": "Source-separation model id (empty = server default, mlx-community/sam-audio-large-fp16)."
+        },
+        "soundLab.mlx.studio.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Folder of mlx-audio Studio (`mlx_audio/ui`). Empty = find it in an editable mlx-audio install or download it on first use."
+        },
+        "soundLab.mlx.studio.port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for the mlx-audio Studio dev server."
+        },
+        "soundLab.studio.outputDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Where Sound Lab Studio writes new instrumentals, beats, chords and sound effects. Empty = `sound-lab-studio/` in the first workspace folder (or `~/Sound Lab/Studio`). Relative paths are resolved against the workspace folder. Edits of a track (auto-tune, DJ moves) follow `soundLab.output.*`."
+        },
+        "soundLab.dj.separation": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "mlx",
+            "center"
+          ],
+          "enumDescriptions": [
+            "mlx-audio AI separation when its server is running, otherwise center-channel extraction",
+            "Always use mlx-audio (starts the server)",
+            "Always use the built-in center-channel extractor (stereo files only)"
+          ],
+          "default": "auto",
+          "description": "How DJ: Acapella / Instrumental and Mashup split vocals from music."
         }
       }
     }
@@ -648,15 +1228,23 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node --test test/*.test.js",
-    "package": "vsce package --allow-missing-repository",
+    "package": "vsce package",
     "vscode:prepublish": "npm run compile",
-    "test:ui": "npm run compile && node test/ui/harness.js",
+    "test:ui": "npm run compile && node test/ui/harness.js && node test/ui/mlx-harness.js",
     "test:all": "npm test && node test/ui/harness.js"
   },
   "devDependencies": {
-    "@types/node": "20.14.10",
-    "@types/vscode": "1.85.0",
-    "@vscode/vsce": "3.2.1",
-    "typescript": "5.6.3"
-  }
+    "@types/node": "26.6.6",
+    "@types/vscode": "1.144.0",
+    "@vscode/vsce": "4.1.0",
+    "typescript": "7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloud-fronts-group/sound-lab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cloud-fronts-group/sound-lab/issues"
+  },
+  "homepage": "https://github.com/cloud-fronts-group/sound-lab#readme"
 }

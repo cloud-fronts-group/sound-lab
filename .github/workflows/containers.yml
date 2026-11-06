@@ -1,0 +1,79 @@
+name: Build Sound Lab containers
+
+on:
+  push:
+    branches: [main]
+    paths: ["plugins/sound-lab-studio/containers/**", ".github/workflows/containers.yml"]
+  # Build-only check (nothing is pushed) when a PR touches the images.
+  pull_request:
+    paths: ["plugins/sound-lab-studio/containers/**", ".github/workflows/containers.yml"]
+  workflow_dispatch:
+  # Called by the Release workflow to publish images tagged with the release version.
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to build from
+        type: string
+        required: false
+        default: ""
+      version:
+        description: Release version X.Y.Z; adds :X.Y.Z / :X.Y.Z-<variant> tags
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: sound-lab-mlx-audio, tag: cpu,    context: mlx-audio,      args: "MLX_EXTRA=cpu",    platforms: "linux/amd64,linux/arm64" }
+          - { name: sound-lab-mlx-audio, tag: cuda12, context: mlx-audio,      args: "MLX_EXTRA=cuda12", platforms: "linux/amd64" }
+          - { name: sound-lab-ffmpeg,    tag: latest, context: ffmpeg,         args: "",                 platforms: "linux/amd64,linux/arm64" }
+          - { name: sound-lab-whisper-vulkan, tag: latest, context: whisper-vulkan, args: "",           platforms: "linux/amd64,linux/arm64" }
+    env:
+      PUSH: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Image tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
+          VARIANT: ${{ matrix.tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          image="${IMAGE,,}"
+          tags="$image:$VARIANT"
+          if [ -n "$VERSION" ]; then
+            # :latest images get a bare :X.Y.Z; variants (cpu, cuda12) get :X.Y.Z-<variant>.
+            if [ "$VARIANT" = latest ]; then tags="$tags,$image:$VERSION"; else tags="$tags,$image:$VERSION-$VARIANT"; fi
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "$tags"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        if: env.PUSH == 'true'
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v7
+        with:
+          context: plugins/sound-lab-studio/containers/${{ matrix.context }}
+          build-args: ${{ matrix.args }}
+          platforms: ${{ matrix.platforms }}
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.tags.outputs.revision }}
+            org.opencontainers.image.version=${{ inputs.version || matrix.tag }}
+          cache-from: type=gha,scope=${{ matrix.name }}-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-${{ matrix.tag }}

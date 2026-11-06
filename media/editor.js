@@ -3,11 +3,13 @@
 (function () {
   // @ts-ignore
   const vscode = acquireVsCodeApi();
+  const ic = (/** @type {string} */ n) => `<svg class="ic" aria-hidden="true" focusable="false"><use href="#sl-${n}"/></svg>`;
   const $ = (/** @type {string} */ id) => /** @type {any} */ (document.getElementById(id));
 
   const canvas = /** @type {HTMLCanvasElement} */ ($('wave'));
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
   const audio = /** @type {HTMLAudioElement} */ ($('audio'));
+  const deck = { a: $('deckA'), b: $('deckB') };
 
   const S = {
     info: /** @type {any} */ (null),
@@ -171,6 +173,7 @@
     $('selInfo').textContent = S.sel
       ? `Selection ${fmt(S.sel.start)} → ${fmt(S.sel.end)}  (${fmt(S.sel.end - S.sel.start)})`
       : 'No selection — drag on the waveform';
+    syncDecks();
     requestDraw();
   }
 
@@ -238,6 +241,15 @@
   function stop() { audio.pause(); seek(S.sel ? S.sel.start : 0); }
   function playRange(a, b) { setSel({ start: a, end: b }); audio.currentTime = a; audio.play().catch(() => undefined); }
 
+  // Deck A spins while the track plays; deck B (the selection) spins while playback is inside it, or always when looping it.
+  function syncDecks() {
+    const playing = !audio.paused;
+    const t = audio.currentTime || 0;
+    document.body.classList.toggle('playing', playing);
+    deck.a.classList.toggle('on', playing);
+    deck.b.classList.toggle('on', playing && !!S.sel && (S.loop || (t >= S.sel.start && t <= S.sel.end)));
+  }
+
   function tick(force = false) {
     const t = audio.currentTime || 0;
     if (S.sel && !audio.paused) {
@@ -252,18 +264,19 @@
       const span = S.view.end - S.view.start; setView(t - span * 0.05, t + span * 0.95);
     }
     highlightSegment(t);
+    syncDecks();
     if (force || !audio.paused) { requestDraw(); }
   }
   (function loop() { if (!audio.paused) { tick(); } requestAnimationFrame(loop); })();
-  audio.addEventListener('play', () => { $('play').textContent = '❚❚'; });
-  audio.addEventListener('pause', () => { $('play').textContent = '▶'; tick(true); });
-  audio.addEventListener('ended', () => { if (S.loop) { seek(S.sel ? S.sel.start : 0); audio.play(); } });
+  audio.addEventListener('play', () => { $('play').innerHTML = ic('pause'); syncDecks(); });
+  audio.addEventListener('pause', () => { $('play').innerHTML = ic('play'); tick(true); });
+  audio.addEventListener('ended', () => { syncDecks(); if (S.loop) { seek(S.sel ? S.sel.start : 0); audio.play(); } });
   audio.addEventListener('loadedmetadata', () => { if (!S.duration && isFinite(audio.duration)) { S.duration = audio.duration; $('dur').textContent = fmt(S.duration); fit(); } });
   audio.addEventListener('error', () => showError('This audio could not be played in the editor preview (analysis tools still work).'));
 
   $('play').onclick = togglePlay;
   $('stop').onclick = stop;
-  $('loop').onclick = () => { S.loop = !S.loop; $('loop').classList.toggle('on', S.loop); };
+  $('loop').onclick = () => { S.loop = !S.loop; $('loop').classList.toggle('on', S.loop); syncDecks(); };
   $('rate').onchange = () => { audio.playbackRate = Number($('rate').value); };
   $('vol').oninput = () => { audio.volume = Number($('vol').value); };
   audio.volume = 0.9;
@@ -306,7 +319,7 @@
     if (name === 'transcript' && !S.transcript) { renderTranscript(); }
   }
   document.querySelectorAll('[data-panel]').forEach(b => b.addEventListener('click', () => openPanel(/** @type {HTMLElement} */ (b).dataset.panel)));
-  document.querySelectorAll('[data-run]').forEach(b => b.addEventListener('click', () => vscode.postMessage({ type: 'run', command: /** @type {HTMLElement} */ (b).dataset.run })));
+  document.querySelectorAll('[data-run]').forEach(b => b.addEventListener('click', () => vscode.postMessage({ type: 'run', command: /** @type {HTMLElement} */ (b).dataset.run, at: audio.currentTime || 0 })));
   $('levelsRefresh').onclick = () => openPanel('levels', true);
   $('trun').onclick = () => { $('transcriptBody').textContent = 'Transcribing…'; vscode.postMessage({ type: 'transcribe' }); };
   $('tcopy').onclick = () => S.transcript && vscode.postMessage({ type: 'copy', text: S.transcript.map(s => s.text).join('\n') });
@@ -315,7 +328,7 @@
   function renderLevels(r) {
     if (!r) { $('levelsBody').textContent = 'Measurement cancelled or failed.'; return; }
     const f = (v, u) => (v === null || v === undefined || Number.isNaN(v) ? '—' : !isFinite(v) ? '−∞' : v.toFixed(1)) + (u ? ` ${u}` : '');
-    const meter = (v, lo, hi) => `<div class="meter"><div style="width:${clamp(((v - lo) / (hi - lo)) * 100, 0, 100)}%"></div></div>`;
+    const meter = (v, lo, hi) => `<div class="meter"><div data-w="${clamp(((v - lo) / (hi - lo)) * 100, 0, 100).toFixed(1)}"></div></div>`;
     const stats = Object.entries(r.stats || {}).filter(([k]) => /Peak level|RMS level|Crest|Dynamic range|DC offset|Noise floor|Zero crossings rate|Flat factor/.test(k));
     $('levelsBody').classList.remove('muted');
     $('levelsBody').innerHTML = `
@@ -324,12 +337,14 @@
         <div><div class="muted">True peak</div><div class="big">${f(r.truePeakDbtp, 'dBTP')}</div>${meter(r.truePeakDbtp, -30, 3)}</div>
         <div><div class="muted">Loudness range</div><div class="big">${f(r.lra, 'LU')}</div>${meter(r.lra, 0, 25)}</div>
       </div>
-      <table style="margin-top:12px">
+      <table class="mt12">
         <tr><th>Mean volume</th><td>${f(r.meanVolumeDb, 'dB')}</td><th>Max volume</th><td>${f(r.maxVolumeDb, 'dB')}</td></tr>
         ${stats.map(([k, v]) => `<tr><th>${esc(k)}</th><td colspan="3">${esc(String(v))}</td></tr>`).join('')}
         <tr><th>To −14 LUFS</th><td>${isFinite(r.integratedLufs) ? ((-14 - r.integratedLufs >= 0 ? '+' : '') + (-14 - r.integratedLufs).toFixed(1) + ' dB') : '—'}</td>
             <th>To −23 LUFS</th><td>${isFinite(r.integratedLufs) ? ((-23 - r.integratedLufs >= 0 ? '+' : '') + (-23 - r.integratedLufs).toFixed(1) + ' dB') : '—'}</td></tr>
       </table>`;
+    // CSP forbids inline style attributes; set meter widths through the CSSOM instead.
+    $('levelsBody').querySelectorAll('[data-w]').forEach((/** @type {HTMLElement} */ el) => { el.style.width = `${el.dataset.w}%`; });
   }
 
   function renderRegions() {
@@ -349,7 +364,7 @@
     const body = $('transcriptBody');
     if (!S.transcript || !S.transcript.length) {
       body.classList.add('muted');
-      body.innerHTML = 'No transcript yet. <button class="link" id="tgo">Transcribe now</button>';
+      body.innerHTML = 'No transcript yet. <button class="link" id="tgo">'+ic('transcribe')+'Transcribe now</button>';
       const go = document.getElementById('tgo'); if (go) { go.onclick = () => $('trun').click(); }
       return;
     }

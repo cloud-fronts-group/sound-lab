@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "sound-lab-studio",
+  "displayName": "Sound Lab Studio",
+  "version": "0.1.0",
+  "description": "FFmpeg audio/video toolkit for Claude: dubbing (music beds, streams, video), sound-effect design, Whisper/MLX transcription, MP3 & MP4 experts, safety hooks, and an MCP server that runs batch ffmpeg, speech-to-text, TTS and source separation in the background — locally on Apple Silicon (VideoToolbox, MLX), in Docker/Podman/Apple containers, or against an MLX audio service (mlx[cuda12] on NVIDIA).",
+  "author": { "name": "Cloud Fronts Group", "url": "https://github.com/cloud-fronts-group" },
+  "homepage": "https://github.com/cloud-fronts-group/sound-lab/tree/main/plugins/sound-lab-studio",
+  "repository": "https://github.com/cloud-fronts-group/sound-lab",
+  "license": "GPL-3.0-only",
+  "keywords": ["ffmpeg", "audio", "video", "dubbing", "sound-design", "sfx", "whisper", "mlx", "transcription", "tts", "mp3", "mp4", "apple-silicon", "mcp"],
+  "userConfig": {
+    "runner": {
+      "type": "string", "title": "ffmpeg runner",
+      "description": "Where batch ffmpeg jobs run. local = host ffmpeg (Apple GPU via VideoToolbox on Macs). docker/podman = the Sound Lab ffmpeg image (CPU, reproducible).",
+      "options": ["local", "docker", "podman"], "default": "local"
+    },
+    "container_gpu": {
+      "type": "string", "title": "Container GPU",
+      "description": "GPU passthrough for container jobs: dri (/dev/dri — Vulkan; podman+libkrun on macOS), nvidia (--gpus all / CDI), none.",
+      "options": ["none", "dri", "nvidia"], "default": "none"
+    },
+    "max_concurrency": {
+      "type": "number", "title": "Parallel jobs", "description": "Maximum ffmpeg/transcription processes running at once.",
+      "default": 2, "min": 1, "max": 16
+    },
+    "output_dir": {
+      "type": "string", "title": "Default output folder",
+      "description": "Where batch outputs go when a tool call doesn't say. Empty = next to each input.", "default": ""
+    },
+    "mlx_mode": {
+      "type": "string", "title": "MLX audio service mode",
+      "description": "How the MLX audio inference server (STT/TTS/separation) runs. auto = native on Apple Silicon (Metal GPU), docker elsewhere. docker/podman/apple-container run the Sound Lab mlx-audio image (CPU on macOS; mlx[cuda12] on Linux+NVIDIA). external = use mlx_url.",
+      "options": ["auto", "native", "docker", "podman", "apple-container", "external"], "default": "auto"
+    },
+    "mlx_gpu": {
+      "type": "string", "title": "MLX container GPU",
+      "description": "nvidia = use the :cuda12 image (pip mlx[cuda12]) with GPU passthrough. none = :cpu image.",
+      "options": ["none", "nvidia"], "default": "none"
+    },
+    "mlx_url": {
+      "type": "string", "title": "MLX service URL",
+      "description": "Base URL of an already-running mlx-audio server (mode external), e.g. http://gpu-box:8000. Empty = http://127.0.0.1:<port>.", "default": ""
+    },
+    "mlx_port": { "type": "number", "title": "MLX service port", "description": "Local port the MLX service listens on / is published to.", "default": 8000, "min": 1024, "max": 65535 },
+    "mlx_image": {
+      "type": "string", "title": "MLX container image",
+      "description": "Image for docker/podman/apple-container modes. Empty = ghcr.io/cloud-fronts-group/sound-lab-mlx-audio:<cpu|cuda12>.", "default": ""
+    },
+    "stt_backend": {
+      "type": "string", "title": "Speech-to-text backend",
+      "description": "auto prefers the MLX service, then mlx_whisper, whisper.cpp, an OpenAI-compatible API (OPENAI_API_KEY), FFmpeg 8 whisper.",
+      "options": ["auto", "mlx-service", "mlx", "whisper.cpp", "openai", "ffmpeg"], "default": "auto"
+    },
+    "stt_model": { "type": "string", "title": "MLX speech-to-text model", "description": "Hugging Face id for MLX Whisper.", "default": "mlx-community/whisper-large-v3-turbo" },
+    "tts_model": { "type": "string", "title": "MLX text-to-speech model", "description": "Hugging Face id for MLX TTS (voice-overs, dubbing).", "default": "mlx-community/Kokoro-82M-bf16" },
+    "tts_voice": { "type": "string", "title": "Default TTS voice", "description": "Voice preset for the TTS model (Kokoro: af_heart, am_adam, bf_emma, bm_george…).", "default": "af_heart" },
+    "whispercpp_model": { "type": "string", "title": "whisper.cpp model file", "description": "Path to a ggml-*.bin model for the whisper.cpp backend (optional).", "default": "" }
+  },
+  "mcpServers": {
+    "sound-lab-media": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"],
+      "env": {
+        "SOUND_LAB_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "SOUND_LAB_RUNNER": "${user_config.runner}",
+        "SOUND_LAB_GPU": "${user_config.container_gpu}",
+        "SOUND_LAB_MAX_CONCURRENCY": "${user_config.max_concurrency}",
+        "SOUND_LAB_OUTPUT_DIR": "${user_config.output_dir}",
+        "SOUND_LAB_MLX_MODE": "${user_config.mlx_mode}",
+        "SOUND_LAB_MLX_GPU": "${user_config.mlx_gpu}",
+        "SOUND_LAB_MLX_URL": "${user_config.mlx_url}",
+        "SOUND_LAB_MLX_PORT": "${user_config.mlx_port}",
+        "SOUND_LAB_MLX_IMAGE": "${user_config.mlx_image}",
+        "SOUND_LAB_STT_BACKEND": "${user_config.stt_backend}",
+        "SOUND_LAB_STT_MODEL": "${user_config.stt_model}",
+        "SOUND_LAB_TTS_MODEL": "${user_config.tts_model}",
+        "SOUND_LAB_TTS_VOICE": "${user_config.tts_voice}",
+        "SOUND_LAB_WHISPERCPP_MODEL": "${user_config.whispercpp_model}"
+      }
+    }
+  }
+}

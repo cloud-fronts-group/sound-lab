@@ -3,6 +3,11 @@ import { AudioEditorProvider } from './audioEditor';
 import { SampleExplorer } from './sampleExplorer';
 import * as C from './commands';
 import { refreshCapabilities, resolveTargets, state, openMedia } from './util';
+import { MlxController } from './mlx';
+import { MlxPanelProvider } from './mlxPanel';
+import { StudioPanel } from './studioPanel';
+import { VoiceCloneWizard } from './voiceCloneWizard';
+import { StudioTools } from './studioTools';
 
 export function activate(context: vscode.ExtensionContext) {
   state.context = context;
@@ -20,6 +25,13 @@ export function activate(context: vscode.ExtensionContext) {
       supportsMultipleEditorsPerDocument: true,
     }),
   );
+
+  const mlx = new MlxController(context);
+  C.setMlxTranscription(mlx.transcriptionConfig());
+  context.subscriptions.push(mlx, vscode.window.registerWebviewViewProvider(MlxPanelProvider.viewType, new MlxPanelProvider(context, mlx), { webviewOptions: { retainContextWhenHidden: true } }));
+
+  const studio = new StudioTools(mlx);
+  const openStudio = (tool?: string, track?: unknown) => StudioPanel.open(mlx, context, studio, { tool, track: track instanceof vscode.Uri ? track.fsPath : undefined });
 
   const commands: Record<string, (...args: any[]) => unknown> = {
     'soundLab.openPreview': async (a?: unknown, b?: unknown) => { const [u] = await resolveTargets(a, b, { title: 'Open' }); if (u) { await openMedia(u); } },
@@ -45,6 +57,32 @@ export function activate(context: vscode.ExtensionContext) {
     'soundLab.showCapabilities': C.cmdShowCapabilities,
     'soundLab.showLog': () => state.output.show(),
     'soundLab.refreshSamples': () => explorer.refresh(),
+    'soundLab.voiceClone': (a?: unknown) => VoiceCloneWizard.open(mlx, context, a),
+    'soundLab.mlxStart': () => mlx.cmdStart(),
+    'soundLab.mlxStop': () => mlx.cmdStop(),
+    'soundLab.mlxStatus': () => mlx.cmdStatus(),
+    'soundLab.mlxModels': () => mlx.cmdModels(),
+    'soundLab.mlxSynthesize': (a?: unknown) => mlx.cmdSynthesize(a),
+    'soundLab.mlxSeparate': (a?: unknown, b?: unknown) => mlx.cmdSeparate(a, b),
+    'soundLab.mlxOpenStudio': () => StudioPanel.open(mlx, context, studio, { startStudio: true }),
+    'soundLab.openStudio': () => openStudio(),
+    'soundLab.addInstrumental': () => openStudio('instrumental'),
+    'soundLab.addBeats': () => openStudio('beats'),
+    'soundLab.addChords': () => openStudio('chords'),
+    'soundLab.addSoundFx': () => openStudio('sfx'),
+    'soundLab.layerOnto': async (a?: unknown, b?: unknown) => { const [u] = await resolveTargets(a, b, { title: 'Layer onto' }); if (u) { await StudioPanel.open(mlx, context, studio, { tool: 'layer', track: u.fsPath }); } },
+    'soundLab.autoTune': (a?: unknown, b?: unknown) => studio.cmdAutoTune(a, b),
+    'soundLab.detectTempoKey': (a?: unknown, b?: unknown) => studio.cmdDetect(a, b),
+    'soundLab.djBackspin': (a?: unknown, b?: unknown) => studio.cmdDj('backspin', a, b),
+    'soundLab.djEchoOut': (a?: unknown, b?: unknown) => studio.cmdDj('echoout', a, b),
+    'soundLab.djBeatJump': (a?: unknown, b?: unknown) => studio.cmdDj('beatjump', a, b),
+    'soundLab.djDoubleDrop': (a?: unknown, b?: unknown) => studio.cmdDj('doubledrop', a, b),
+    'soundLab.djQuickMix': (a?: unknown, b?: unknown) => studio.cmdDj('quickmix', a, b),
+    'soundLab.djLongBlend': (a?: unknown, b?: unknown) => studio.cmdDj('longblend', a, b),
+    'soundLab.djMashup': (a?: unknown, b?: unknown) => studio.cmdDj('mashup', a, b),
+    'soundLab.djAcapella': (a?: unknown, b?: unknown) => studio.cmdDj('acapella', a, b),
+    'soundLab.djInstrumental': (a?: unknown, b?: unknown) => studio.cmdDj('novocals', a, b),
+    'soundLab.mlxStopStudio': () => mlx.cmdStopStudio(),
   };
   for (const [id, fn] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(id, async (...args: unknown[]) => {
