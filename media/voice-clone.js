@@ -132,6 +132,7 @@
     choosePurpose(S.purpose, '#purposes4');
   }
   $('changeVoice').addEventListener('click', () => go(1));
+  $('openPresStudio')?.addEventListener('click', () => send('openPresStudio'));
   const radio = (/** @type {string} */ name) => /** @type {HTMLInputElement|null} */ (document.querySelector(`input[name=${name}]:checked`))?.value;
   document.querySelectorAll('[data-pick]').forEach((/** @type {HTMLElement} */ b) => b.addEventListener('click', () => send('pick', { purpose: b.dataset.pick, source: radio('psrc') })));
   document.querySelectorAll('input[name=psrc], input[name=asrc]').forEach(r => r.addEventListener('change', () => { S.files[S.purpose] = ''; $(`pick-${S.purpose}`).textContent = ''; updateCreate(); }));

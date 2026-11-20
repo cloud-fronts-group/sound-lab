@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sound-lab-adk"
+version = "0.1.0"
+description = "Google ADK agents for Sound Lab: Deep Research presentation scaffolding and mlx-audio voice cloning + video overlay"
+requires-python = ">=3.11"
+dependencies = [
+    "google-adk[mcp]>=2.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+sound-lab-adk = "sound_lab_adk.cli:main"

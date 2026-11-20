@@ -46,6 +46,8 @@ test('activate registers every contributed command, view and editor', async () =
   const ctx = { subscriptions: [], extensionUri: Uri.file(path.join(__dirname, '..')), globalStorageUri: Uri.file(fs.mkdtempSync('/tmp/sl-')), secrets: { get: async () => undefined } };
   ext.activate(ctx);
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  assert.equal(pkg.publisher, 'cloud-fronts-group');
+  assert.equal(typeof pkg.author === 'string' ? pkg.author : pkg.author?.name, 'cloud-fronts-group');
   const declared = pkg.contributes.commands.map(c => c.command).sort();
   const notRegistered = declared.filter(c => !registered.has(c));
   const notDeclared = [...registered.keys()].filter(c => !declared.includes(c));
@@ -79,8 +81,8 @@ test('activate registers every contributed command, view and editor', async () =
   const tpl = html.slice(html.indexOf('<body>'));
   for (const [, tag] of tpl.matchAll(/(<button\b[^>]*>[\s\S]*?<\/button>)/g)) { assert.ok(/icon\('[\w-]+'\)/.test(tag), `webview button without icon: ${tag.slice(0, 80)}`); }
   assert.ok(/ic\('transcribe'\)\+'Transcribe now/.test(editorJs), 'Transcribe now button needs its icon');
-  // the MLX panel, Studio panel and Voice Clone wizard follow the same rule
-  for (const [ts, js] of [['mlxPanel.ts', 'mlx-panel.js'], ['studioPanel.ts', 'studio.js'], ['voiceCloneWizard.ts', 'voice-clone.js']]) {
+  // the MLX panel, Studio panel, Voice Clone wizard, and Presentation Studio follow the same rule
+  for (const [ts, js] of [['mlxPanel.ts', 'mlx-panel.js'], ['studioPanel.ts', 'studio.js'], ['voiceCloneWizard.ts', 'voice-clone.js'], ['presentationStudio.ts', 'presentation.js']]) {
     const tsSrc = fs.readFileSync(path.join(__dirname, '..', 'src', ts), 'utf8');
     const jsSrc = fs.readFileSync(path.join(__dirname, '..', 'media', js), 'utf8');
     for (const [, name] of (tsSrc + jsSrc).matchAll(/(?:icon|ic)\('([\w-]+)'\)/g)) { assert.ok(known.has(name), `${ts}/${js} uses unknown icon '${name}'`); }

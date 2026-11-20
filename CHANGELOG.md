@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- **Presentation & Live Tutorial Studio (`soundLab.newPresentation`, `soundLab.recordTutorial`, `soundLab.setGeminiApiKey`) + Google ADK Multi-Agent Backend**:
+  - Guided workflow starting with cloning or picking the presenter's voice, capturing topic/folder/5–10 minute target pacing, running a Google ADK Deep Research workflow (`deep_research_agent` using `deep-research-preview-04-2026` / `deep-research-max-preview-04-2026` with folder scanning & offline folder fallback), and scaffolding `presentation.json`, `slides.md`, `slides.html`, `narration-script.txt`, and `research-report.md`.
+  - Simultaneous live screen (`avfoundation` / `gdigrab` / `x11grab`) or slide presentation recording with concurrent rolling WAV chunk transcription (`mlx-audio`), real-time voice cloning, and final MP4 tutorial output embedding cloned audio and `mov_text` transcript subtitles plus `.srt`/`.vtt`/`.txt`/`.json` sidecars.
+  - Dedicated `mlx_voice_clone_expert` Google ADK agent (`adk/sound_lab_adk/`) and `presentation_workflow_agent` / `sound_lab_presentation_coordinator`, plus Claude Code plugin MCP tools (`scaffold_presentation`, `overlay_presentation`, `record_screen_plan`), agents (`mlx-voice-clone-expert`, `presentation-researcher`), and `presentation-tutorial` skill.
 - **CI/CD**: GitHub Actions CI on every pull request (Linux + macOS, real ffmpeg, webview UI harness, plugin tests and validation), and a one-click Release workflow that versions the extension and plugin together and publishes the VSIX, plugin zip, Marketplace/Open VSX listing and versioned container images.
 - **Sound Lab Studio** (the Studio tab, renamed): Create and DJ ribbons with tool drawers. mlx-audio Studio is embedded in the same tab.
   - Create: Instrumental (9 genres), Beats (7 styles), Chords (roman numerals or names, 8 instruments, 5 rhythms), Sound FX (15, tempo-sized), Auto-tune (YIN + scale snapping + PSOLA, retune speed and amount) and Layer (loop, offset, duck), all sharing one tempo, key and scale.

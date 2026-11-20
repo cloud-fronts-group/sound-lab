@@ -130,7 +130,7 @@ Check these, in order:
 
 ## Disk space and caches
 
-Sound Lab keeps two caches in the extension's global storage folder and never prunes them: `preview/` (FLAC copies of files the editor cannot play) and `spectrograms/` (PNG images). Delete the folders whenever you like; they are rebuilt on demand. Typical locations: `~/Library/Application Support/Code/User/globalStorage/sound-lab.sound-lab/` (macOS), `~/.config/Code/User/globalStorage/sound-lab.sound-lab/` (Linux), `%APPDATA%\Code\User\globalStorage\sound-lab.sound-lab\` (Windows).
+Sound Lab keeps two caches in the extension's global storage folder and never prunes them: `preview/` (FLAC copies of files the editor cannot play) and `spectrograms/` (PNG images). Delete the folders whenever you like; they are rebuilt on demand. Typical locations: `~/Library/Application Support/Code/User/globalStorage/cloud-fronts-group.sound-lab/` (macOS), `~/.config/Code/User/globalStorage/cloud-fronts-group.sound-lab/` (Linux), `%APPDATA%\Code\User\globalStorage\cloud-fronts-group.sound-lab\` (Windows).
 
 ## Starting over
 

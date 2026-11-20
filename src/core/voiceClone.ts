@@ -5,6 +5,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { run, runOk } from './ffmpeg';
 import { parseSilence } from './analysis';
+import { muxTutorialTracks, slidesToVideo } from './recipes';
+import { writeSlidePngs } from './pngSlides';
+import { PresentationSpec, writeTranscriptSidecars } from './presentation';
 import { Segment } from './subtitles';
 
 export type Purpose = 'presentation' | 'audiobook' | 'vocals';
@@ -281,15 +284,19 @@ export async function renderAudiobook(t: Tools, text: string, outDir: string, sp
 /**
  * Presentation: narrate timed segments (from a transcript of the recorded talk) in the cloned voice, each starting at its
  * original time (pushed later if the previous line is still speaking), or untimed script paragraphs back to back.
- * With a video, the narration is added as a new default audio track (original kept as track 2).
+ * Writes synchronized transcript sidecars (.srt, .vtt, .txt, .json). With a video, the narration is added as a new
+ * default audio track (original kept as track 2) and the transcript is embedded as a subtitle track.
  */
-export async function renderPresentation(t: Tools, segments: Segment[] | string, outDir: string, speak: Speak, o: { video?: string; baseName: string; lang?: string } & RenderHooks): Promise<{ narration: string; video?: string; timeline: Segment[]; pushed: number }> {
+export async function renderPresentation(
+  t: Tools, segments: Segment[] | string, outDir: string, speak: Speak,
+  o: { video?: string; baseName: string; lang?: string; embedSubtitles?: boolean; writeSidecars?: boolean } & RenderHooks,
+): Promise<{ narration: string; video?: string; timeline: Segment[]; pushed: number; transcripts: string[] }> {
   const timed = typeof segments !== 'string';
   const items: Segment[] = timed ? (segments as Segment[]).filter(s => s.text.trim())
     : chunkText(speakable(segments as string)).map(c => ({ start: NaN, end: NaN, text: c.text, ...(c.paragraphEnd ? { speaker: 'para' } : {}) }));
   if (!items.length) { throw new Error('Nothing to narrate.'); }
   const work = path.join(outDir, `.${o.baseName}-work`);
-  const files = await speakAll(items.map(s => s.text), work, speak, o, 0, 0.8);
+  const files = await speakAll(items.map(s => s.text), work, speak, o, 0, 0.78);
   // lay out the timeline
   const timeline: Segment[] = []; let cursor = 0; let pushed = 0;
   for (let i = 0; i < files.length; i++) {
@@ -304,19 +311,127 @@ export async function renderPresentation(t: Tools, segments: Segment[] | string,
   files.forEach(f => args.push('-i', f));
   const parts = files.map((_, i) => `[${i}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=mono,adelay=${Math.round(timeline[i].start * 1000)}:all=1[n${i}]`);
   const graph = `${parts.join(';')};${files.map((_, i) => `[n${i}]`).join('')}amix=inputs=${files.length}:duration=longest:normalize=0,highpass=f=70,acompressor=threshold=0.12:ratio=2.5:attack=8:release=120,loudnorm=I=-16:TP=-1.5:LRA=9,aresample=48000[out]`;
-  o.onProgress?.(0.85, 'Assembling narration');
+  o.onProgress?.(0.84, 'Assembling narration');
   await runOk({ exe: t.ffmpeg, args: [...args, '-filter_complex', graph, '-map', '[out]', '-c:a', 'pcm_s24le', narration], signal: o.signal });
+
+  let transcripts: string[] = [];
+  let srtPath: string | undefined;
+  if (o.writeSidecars !== false || (o.video && o.embedSubtitles !== false)) {
+    transcripts = writeTranscriptSidecars(path.join(outDir, `${o.baseName} (narration)`), timeline, { source: o.video ? path.basename(o.video) : o.baseName, backend: 'mlx-audio-voice-clone', language: o.lang });
+    srtPath = transcripts.find(f => f.endsWith('.srt'));
+  }
+
   let video: string | undefined;
   if (o.video) {
     video = path.join(outDir, `${o.baseName} (narrated)${/\.(mov|mkv)$/i.test(o.video) ? path.extname(o.video) : '.mp4'}`);
-    o.onProgress?.(0.93, 'Adding narration track to the video');
-    const mp4 = /\.(mp4|m4v|mov)$/i.test(video);
-    await runOk({ exe: t.ffmpeg, signal: o.signal, args: ['-hide_banner', '-nostdin', '-y', '-i', o.video, '-i', narration, '-map', '0:v?', '-map', '1:a', '-map', '0:a?',
-      '-c:v', 'copy', '-c:a:0', 'aac', '-b:a:0', '192k', '-c:a:1', 'copy', '-metadata:s:a:0', `language=${o.lang || 'und'}`, '-metadata:s:a:0', 'title=Narration (cloned voice)', '-metadata:s:a:0', 'handler_name=Narration (cloned voice)',
-      '-disposition:a:0', 'default', '-disposition:a:1', '0', ...(mp4 ? ['-movflags', '+faststart'] : []), video] });
+    o.onProgress?.(0.93, 'Adding cloned narration & transcript to video');
+    const muxArgs = muxTutorialTracks(o.video, narration, o.embedSubtitles !== false ? srtPath : undefined, video, { language: o.lang || 'und', keepOriginalAudio: true });
+    await runOk({ exe: t.ffmpeg, signal: o.signal, args: muxArgs });
   }
   fs.rmSync(work, { recursive: true, force: true });
-  return { narration, video, timeline, pushed };
+  return { narration, video, timeline, pushed, transcripts };
+}
+
+/**
+ * Overlay a scaffolded slide presentation with cloned-voice narration and synchronized transcript.
+ * Synthesizes narration per slide chunk, renders PNG slide frames matched to the exact synthesized timing,
+ * writes .srt/.vtt/.txt/.json transcripts, and builds an MP4 video tutorial with embedded mov_text subtitles.
+ */
+export async function renderSlidePresentationVideo(
+  t: Tools, spec: PresentationSpec, outDir: string, speak: Speak,
+  o: { baseName?: string; lang?: string; width?: number; height?: number; videoEncoder?: 'libx264' | 'h264_videotoolbox'; slidePauseSec?: number } & RenderHooks = {},
+): Promise<{ video: string; narration: string; timeline: Segment[]; transcripts: string[]; slideImages: string[]; slideTimings: { index: number; title: string; start: number; end: number }[] }> {
+  if (!spec.slides.length) { throw new Error('Presentation has no slides.'); }
+  fs.mkdirSync(outDir, { recursive: true });
+  const baseName = o.baseName || slug(spec.title);
+  const work = path.join(outDir, `.${baseName}-slides-work`);
+  const slidesDir = path.join(outDir, 'slides-frames');
+  const slidePause = o.slidePauseSec ?? 0.65;
+
+  // 1. Chunk each slide's speakable narration so TTS stays natural, keeping slide boundaries.
+  const chunkMeta: { slideIdx: number; text: string; isFirstInSlide: boolean; paragraphEnd: boolean }[] = [];
+  for (let si = 0; si < spec.slides.length; si++) {
+    const raw = speakable(spec.slides[si].narration || spec.slides[si].title).trim();
+    const parts = chunkText(raw || spec.slides[si].title);
+    parts.forEach((p, ci) => chunkMeta.push({ slideIdx: si, text: p.text, isFirstInSlide: ci === 0, paragraphEnd: p.paragraphEnd }));
+  }
+
+  // 2. Synthesize every narration chunk in the cloned voice.
+  const audioFiles = await speakAll(chunkMeta.map(c => c.text), work, speak, o, 0, 0.72);
+
+  // 3. Measure actual audio durations & lay out exact slide/subtitle timelines.
+  const timeline: Segment[] = [];
+  const slideStart = new Array<number>(spec.slides.length).fill(0);
+  const slideEnd = new Array<number>(spec.slides.length).fill(0);
+  let cursor = 0.4;
+  for (let i = 0; i < audioFiles.length; i++) {
+    const meta = chunkMeta[i];
+    if (meta.isFirstInSlide && i > 0) { cursor += slidePause; }
+    if (meta.isFirstInSlide) { slideStart[meta.slideIdx] = i === 0 ? 0 : cursor - slidePause * 0.4; }
+    const d = await duration(t.ffprobe, audioFiles[i]);
+    const start = cursor;
+    const end = start + d;
+    timeline.push({ start, end, text: meta.text });
+    slideEnd[meta.slideIdx] = end;
+    cursor = end + (meta.paragraphEnd ? 0.35 : 0.2);
+  }
+  const totalDur = cursor + 0.6;
+  const slideTimings = spec.slides.map((s, si) => {
+    const start = si === 0 ? 0 : slideStart[si];
+    const end = si === spec.slides.length - 1 ? totalDur : slideStart[si + 1];
+    return { index: s.index, title: s.title, start, end };
+  });
+
+  // 4. Assemble and master cloned narration track (-16 LUFS).
+  o.onProgress?.(0.78, 'Mastering cloned-voice narration');
+  const narration = path.join(outDir, `${baseName} (narration).wav`);
+  const mixArgs = ['-hide_banner', '-nostdin', '-y'];
+  audioFiles.forEach(f => mixArgs.push('-i', f));
+  const mixParts = audioFiles.map((_, i) => `[${i}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=mono,adelay=${Math.round(timeline[i].start * 1000)}:all=1[n${i}]`);
+  const mixGraph = `${mixParts.join(';')};${audioFiles.map((_, i) => `[n${i}]`).join('')}amix=inputs=${audioFiles.length}:duration=longest:normalize=0,apad=whole_dur=${totalDur.toFixed(3)},highpass=f=70,acompressor=threshold=0.12:ratio=2.5:attack=8:release=120,loudnorm=I=-16:TP=-1.5:LRA=9,aresample=48000[out]`;
+  await runOk({ exe: t.ffmpeg, args: [...mixArgs, '-filter_complex', mixGraph, '-map', '[out]', '-c:a', 'pcm_s24le', narration], signal: o.signal });
+
+  // 5. Write .srt / .vtt / .txt / .json transcripts.
+  const transcripts = writeTranscriptSidecars(path.join(outDir, `${baseName} (transcript)`), timeline, { source: spec.title, backend: 'mlx-audio-voice-clone', language: o.lang || 'eng' });
+  const srtPath = transcripts.find(f => f.endsWith('.srt'));
+
+  // 6. Render slide PNG frames and write ffconcat timeline.
+  o.onProgress?.(0.86, 'Rendering slide frames');
+  const slideImages = writeSlidePngs(
+    spec.slides.map((s, si) => ({
+      index: si + 1,
+      total: spec.slides.length,
+      title: s.title,
+      bullets: s.bullets,
+      codeSnippet: s.codeSnippet,
+      presentationTitle: spec.title,
+      subtitleHint: `Slide ${si + 1}/${spec.slides.length} · ${spec.topic}`.slice(0, 72),
+    })),
+    slidesDir,
+    { width: o.width ?? 1280, height: o.height ?? 720 },
+  );
+  const concatFile = path.join(work, 'slides.ffconcat');
+  const concatLines = ['ffconcat version 1.0'];
+  slideImages.forEach((img, si) => {
+    const dur = Math.max(0.5, slideTimings[si].end - slideTimings[si].start);
+    concatLines.push(`file '${img.replace(/'/g, `'\\''`)}'`, `duration ${dur.toFixed(3)}`);
+  });
+  concatLines.push(`file '${slideImages[slideImages.length - 1].replace(/'/g, `'\\''`)}'`);
+  fs.writeFileSync(concatFile, concatLines.join('\n') + '\n');
+
+  // 7. Combine slide frames + cloned narration + embedded transcript track into MP4 tutorial.
+  o.onProgress?.(0.92, 'Overlaying slides with cloned voice & transcript');
+  const video = path.join(outDir, `${baseName} (tutorial).mp4`);
+  const vidArgs = slidesToVideo(concatFile, narration, video, {
+    subtitles: srtPath,
+    language: o.lang || 'eng',
+    width: o.width ?? 1280,
+    height: o.height ?? 720,
+    videoEncoder: o.videoEncoder,
+  });
+  await runOk({ exe: t.ffmpeg, args: vidArgs, signal: o.signal });
+  fs.rmSync(work, { recursive: true, force: true });
+  return { video, narration, timeline, transcripts, slideImages, slideTimings };
 }
 
 /**

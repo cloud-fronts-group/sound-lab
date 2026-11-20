@@ -199,3 +199,43 @@ test('real mlx-audio server (optional)', { skip: !process.env.SOUND_LAB_TEST_MLX
   assert.match(fs.readFileSync(path.join(work, 'real', 'tts.txt'), 'utf8').toLowerCase(), /sound lab|plugin/);
   await c.close();
 });
+
+test('overlay_presentation: slide PNGs + cloned-voice narration + embedded mov_text subtitles', async () => {
+  const { c } = await client('docker', { SOUND_LAB_MLX_GPU: 'none', ...ffEnv });
+  try {
+    await c.call('mlx_service', { action: 'start' });
+    const proj = path.join(work, 'ov-proj');
+    fs.mkdirSync(proj, { recursive: true });
+    fs.writeFileSync(path.join(proj, 'README.md'), '# Overlay Demo\nVoice clone + slides tutorial.\n');
+    const deckDir = path.join(work, 'ov-deck');
+    await c.call('scaffold_presentation', { folder_path: proj, topic: 'Overlay Demo', output_dir: deckDir, target_minutes: 6 });
+    const specPath = path.join(deckDir, 'presentation.json');
+    const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+    spec.slides = spec.slides.slice(0, 2);
+    fs.writeFileSync(specPath, JSON.stringify(spec, null, 2));
+
+    const refWav = tone(path.join(work, 'ov-ref.wav'), 1.5, 220);
+    const job = await c.call('overlay_presentation', {
+      presentation_dir: deckDir,
+      model: 'mlx-community/chatterbox-turbo-4bit',
+      ref_audio: refWav,
+      ref_text: 'Sample voice reference text',
+      language: 'eng',
+    });
+    const done = await c.call('wait_job', { job_id: job.job_id, timeout_s: 60 });
+    assert.equal(done.status, 'done', JSON.stringify(done.items));
+    const out = done.items[0].result;
+    assert.equal(out.slides, 2);
+    assert.equal(out.transcripts.length, 4);
+    for (const tf of out.transcripts) { assert.ok(fs.existsSync(tf)); }
+    const i = info(out.video);
+    assert.equal(i.vcodec, 'h264');
+    assert.equal(i.acodec, 'aac');
+    assert.ok(i.streams.some(s => s.codec_type === 'subtitle' && s.codec_name === 'mov_text'));
+    const cloneReqs = reqLog().filter(r => r.path === '/v1/audio/speech' && r.ref_audio === refWav);
+    assert.ok(cloneReqs.length >= 2);
+  } finally {
+    await c.call('mlx_service', { action: 'stop' }).catch(() => {});
+    await c.close();
+  }
+});

@@ -7,6 +7,7 @@ import { MlxController } from './mlx';
 import { MlxPanelProvider } from './mlxPanel';
 import { StudioPanel } from './studioPanel';
 import { VoiceCloneWizard } from './voiceCloneWizard';
+import { PresentationStudio, cmdSetGeminiApiKey } from './presentationStudio';
 import { StudioTools } from './studioTools';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -83,6 +84,9 @@ export function activate(context: vscode.ExtensionContext) {
     'soundLab.djAcapella': (a?: unknown, b?: unknown) => studio.cmdDj('acapella', a, b),
     'soundLab.djInstrumental': (a?: unknown, b?: unknown) => studio.cmdDj('novocals', a, b),
     'soundLab.mlxStopStudio': () => mlx.cmdStopStudio(),
+    'soundLab.newPresentation': (a?: unknown) => PresentationStudio.open(mlx, context, a),
+    'soundLab.recordTutorial': (a?: unknown) => PresentationStudio.open(mlx, context, a, { step: 4 }),
+    'soundLab.setGeminiApiKey': cmdSetGeminiApiKey,
   };
   for (const [id, fn] of Object.entries(commands)) {
     context.subscriptions.push(vscode.commands.registerCommand(id, async (...args: unknown[]) => {

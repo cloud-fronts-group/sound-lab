@@ -443,3 +443,8 @@ test/ui/out/
 .colab
 .colab/
 .colabignore
+adk/.venv/
+adk/**/__pycache__/
+adk/.pytest_cache/
+__pycache__/
+.pytest_cache/

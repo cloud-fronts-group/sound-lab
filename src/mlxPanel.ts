@@ -48,7 +48,11 @@ export class MlxPanelProvider implements vscode.WebviewViewProvider {
 <section id="clone">
   <h2>${icon('voice-clone')}Voice clone</h2>
   <p class="small muted">Read a few sentences aloud, then narrate a presentation, an audiobook or vocals over an instrumental in your voice.</p>
-  <button id="cloneBtn" class="primary big">${icon('voice-clone')}Voice clone</button>
+  <div class="row">
+    <button id="cloneBtn" class="primary">${icon('voice-clone')}Voice clone</button>
+    <button id="presBtn" title="Clone voice, run Deep Research, and scaffold a 5-10 min presentation">${icon('presentation')}Presentation</button>
+    <button id="recTutBtn" title="Record screen or slides with live transcript & voice clone">${icon('screen-record')}Record tutorial</button>
+  </div>
   <div id="voices" class="list mt8"></div>
 </section>
 
@@ -94,6 +98,8 @@ export class MlxPanelProvider implements vscode.WebviewViewProvider {
       case 'studio': await vscode.commands.executeCommand('soundLab.mlxOpenStudio'); break;
       case 'models': await this.ctl.cmdModels(); break;
       case 'clone': await vscode.commands.executeCommand('soundLab.voiceClone', m.profileId ? { profileId: m.profileId } : undefined); break;
+      case 'presentation': await vscode.commands.executeCommand('soundLab.newPresentation'); break;
+      case 'recordTutorial': await vscode.commands.executeCommand('soundLab.recordTutorial'); break;
       case 'deleteVoice': {
         const ok = await vscode.window.showWarningMessage(`Delete the cloned voice "${m.name}"? Its reference recording is removed.`, { modal: true }, 'Delete');
         if (ok) { deleteProfile(this.ctl.voicesDir, m.id); this.pushState(); }

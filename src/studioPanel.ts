@@ -91,6 +91,7 @@ export class StudioPanel {
       case 'stop': this.ctl.cmdStopStudio(); await this.render(); break;
       case 'start': await this.ctl.ensureStudio(); await this.render(); break;
       case 'clone': vscode.commands.executeCommand('soundLab.voiceClone'); break;
+      case 'presentation': vscode.commands.executeCommand('soundLab.newPresentation'); break;
       case 'tool': this.tool = String(m.tool || ''); break;
       case 'pick': {
         const picked = await vscode.window.showOpenDialog({ openLabel: 'Choose', canSelectMany: false, defaultUri: state.activeEditorUri,
@@ -175,6 +176,7 @@ export class StudioPanel {
         ${nav}
         <span class="spacer"></span>
         <button data-act="clone" title="Record your voice and narrate with it">${icon('voice-clone')}Voice clone</button>
+        <button data-act="presentation" title="Scaffold a 5-10 min instructional presentation &amp; video tutorial">${icon('presentation')}Presentation</button>
         ${url ? `<button data-act="reload" title="Reload">${icon('refresh')}</button>
         <button data-act="external" title="Open in browser">${icon('open-external')}</button>
         <button data-act="stop" title="Stop the Studio dev server">${icon('stop')}</button>` : ''}

@@ -287,6 +287,208 @@ export function parseDevices(platform: NodeJS.Platform, inputFormat: string, out
   return devices;
 }
 
+// ---------- Screen / Video Tutorial Recording & Slide Overlay ----------
+
+export interface ScreenDevice { id: string; label: string; kind: 'screen' | 'camera'; }
+
+export function listScreenDevicesArgs(platform: NodeJS.Platform, inputFormat = ''): string[] | undefined {
+  const fmt = inputFormat || (platform === 'darwin' ? 'avfoundation' : platform === 'win32' ? 'dshow' : 'x11grab');
+  if (fmt === 'avfoundation') { return ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '']; }
+  if (fmt === 'dshow') { return ['-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy']; }
+  return undefined;
+}
+
+export function parseScreenDevices(platform: NodeJS.Platform, inputFormat: string, output: string): ScreenDevice[] {
+  const fmt = inputFormat || (platform === 'darwin' ? 'avfoundation' : platform === 'win32' ? 'gdigrab' : 'x11grab');
+  const devices: ScreenDevice[] = [];
+  const lines = output.split(/\r?\n/);
+  if (fmt === 'avfoundation') {
+    let inVideo = false;
+    for (const l of lines) {
+      if (/AVFoundation video devices/.test(l)) { inVideo = true; continue; }
+      if (/AVFoundation audio devices/.test(l)) { inVideo = false; continue; }
+      const m = /\[(\d+)\]\s+(.+)$/.exec(l);
+      if (inVideo && m) {
+        const label = m[2].trim();
+        devices.push({ id: m[1], label, kind: /capture screen/i.test(label) ? 'screen' : 'camera' });
+      }
+    }
+  } else if (fmt === 'gdigrab' || fmt === 'dshow') {
+    devices.push({ id: 'desktop', label: 'Primary Desktop (gdigrab)', kind: 'screen' });
+    for (const l of lines) {
+      const m = /"([^"]+)"\s+\(video\)/.exec(l);
+      if (m) { devices.push({ id: m[1], label: m[1], kind: 'camera' }); }
+    }
+  } else {
+    devices.push({ id: ':0.0', label: 'X11 Display :0.0', kind: 'screen' });
+  }
+  return devices;
+}
+
+export interface ScreenRecordOptions {
+  platform?: NodeJS.Platform;
+  videoFormat?: string;
+  videoDevice?: string;
+  audioFormat?: string;
+  audioDevice?: string;  // 'none' = video only
+  fps?: number;
+  seconds?: number;
+  videoEncoder?: 'libx264' | 'h264_videotoolbox';
+  chunkDir?: string;     // when set, also writes rolling 16 kHz mono WAV chunks for live STT
+  chunkSeconds?: number;
+}
+
+/**
+ * Record screen (or lavfi test video) + optional microphone audio. When `chunkDir` is provided, a second
+ * output stream simultaneously writes 16 kHz mono WAV segments so live transcription and voice cloning can
+ * run concurrently while recording.
+ */
+export function recordScreen(output: string, opts: ScreenRecordOptions = {}): string[] {
+  const platform = opts.platform ?? process.platform;
+  const vFmt = opts.videoFormat || (platform === 'darwin' ? 'avfoundation' : platform === 'win32' ? 'gdigrab' : 'x11grab');
+  const aFmt = opts.audioFormat || (platform === 'darwin' ? 'avfoundation' : platform === 'win32' ? 'dshow' : 'pulse');
+  const fps = opts.fps ?? 30;
+  const noAudio = opts.audioDevice === 'none';
+  const args = ['-hide_banner', '-y'];
+
+  let audioStream = '';
+  if (vFmt === 'avfoundation' && (noAudio || aFmt === 'avfoundation')) {
+    const vDev = opts.videoDevice || '1';
+    const aDev = noAudio ? 'none' : (opts.audioDevice || '0');
+    args.push('-f', 'avfoundation', '-framerate', String(fps), '-capture_cursor', '1', '-capture_mouse_clicks', '1', '-i', `${vDev}:${aDev}`);
+    if (!noAudio) { audioStream = '0:a:0'; }
+  } else {
+    if (vFmt === 'lavfi') {
+      args.push('-re', '-f', 'lavfi', '-i', opts.videoDevice || `testsrc2=s=1280x720:r=${fps}`);
+    } else if (vFmt === 'gdigrab') {
+      args.push('-f', 'gdigrab', '-framerate', String(fps), '-i', opts.videoDevice || 'desktop');
+    } else if (vFmt === 'x11grab') {
+      args.push('-f', 'x11grab', '-framerate', String(fps), '-i', opts.videoDevice || ':0.0');
+    } else {
+      args.push('-f', vFmt, '-framerate', String(fps), '-i', opts.videoDevice || '0');
+    }
+    if (!noAudio) {
+      if (aFmt === 'lavfi') {
+        args.push('-re', '-f', 'lavfi', '-i', opts.audioDevice || 'sine=f=330:r=16000');
+      } else {
+        args.push(...recordInput(platform, aFmt, opts.audioDevice || ''));
+      }
+      audioStream = '1:a:0';
+    }
+  }
+
+  if (opts.seconds && opts.seconds > 0) { args.push('-t', String(opts.seconds)); }
+
+  const vEnc = opts.videoEncoder === 'h264_videotoolbox'
+    ? ['-c:v', 'h264_videotoolbox', '-b:v', '6M', '-pix_fmt', 'yuv420p']
+    : ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22', '-pix_fmt', 'yuv420p'];
+  const isMp4 = /\.(mp4|m4v|mov)$/i.test(output);
+
+  args.push('-map', '0:v:0');
+  if (audioStream) { args.push('-map', audioStream, '-c:a', 'aac', '-b:a', '192k'); }
+  args.push(...vEnc);
+  if (isMp4) { args.push('-movflags', '+frag_keyframe+empty_moov'); }
+  args.push(output);
+
+  if (opts.chunkDir && audioStream) {
+    const chunkSec = Math.max(2, opts.chunkSeconds ?? 8);
+    const pattern = `${opts.chunkDir.replace(/[/\\]+$/, '')}/chunk_%04d.wav`;
+    args.push('-map', audioStream, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le',
+      '-f', 'segment', '-segment_time', String(chunkSec), '-reset_timestamps', '1', pattern);
+  }
+  return args;
+}
+
+export interface SlidesVideoOptions {
+  subtitles?: string;
+  language?: string;
+  width?: number;
+  height?: number;
+  fps?: number;
+  videoEncoder?: 'libx264' | 'h264_videotoolbox';
+}
+
+/** Combine an ffconcat slide list + cloned narration WAV + optional SRT transcript into a tutorial video. */
+export function slidesToVideo(concatFile: string, narrationWav: string, output: string, opts: SlidesVideoOptions = {}): string[] {
+  const w = opts.width ?? 1280;
+  const h = opts.height ?? 720;
+  const fps = opts.fps ?? 30;
+  const lang = opts.language || 'eng';
+  const isMp4 = /\.(mp4|m4v|mov)$/i.test(output);
+  const args = [...ffBase(), '-f', 'concat', '-safe', '0', '-i', concatFile, '-i', narrationWav];
+  if (opts.subtitles) { args.push('-i', opts.subtitles); }
+  args.push('-map', '0:v:0', '-map', '1:a:0');
+  if (opts.subtitles) { args.push('-map', '2:0'); }
+  args.push('-vf', `fps=${fps},scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p`);
+  if (opts.videoEncoder === 'h264_videotoolbox') {
+    args.push('-c:v', 'h264_videotoolbox', '-b:v', '4M', '-pix_fmt', 'yuv420p');
+  } else {
+    args.push('-c:v', 'libx264', '-tune', 'stillimage', '-crf', '20', '-pix_fmt', 'yuv420p');
+  }
+  args.push(
+    '-c:a', 'aac', '-b:a', '192k',
+    '-metadata:s:a:0', `language=${lang}`,
+    '-metadata:s:a:0', 'title=Narration (cloned voice)',
+    '-metadata:s:a:0', 'handler_name=Narration (cloned voice)',
+    '-disposition:a:0', 'default',
+  );
+  if (opts.subtitles) {
+    args.push(
+      '-c:s', isMp4 ? 'mov_text' : 'srt',
+      '-metadata:s:s:0', `language=${lang}`,
+      '-metadata:s:s:0', 'title=Transcript',
+      '-metadata:s:s:0', 'handler_name=Transcript',
+      '-disposition:s:0', 'default',
+    );
+  }
+  if (isMp4) { args.push('-movflags', '+faststart'); }
+  args.push('-shortest', output);
+  return args;
+}
+
+export interface TutorialMuxOptions {
+  language?: string;
+  keepOriginalAudio?: boolean;
+}
+
+/**
+ * Overlay a recorded screen/slide video with a cloned-voice narration track (default) and an embedded
+ * transcript subtitle track (`mov_text` in MP4/MOV, `srt` in MKV), preserving original audio as track 2.
+ */
+export function muxTutorialTracks(video: string, narrationWav: string, subtitlesSrt: string | undefined, output: string, opts: TutorialMuxOptions = {}): string[] {
+  const lang = opts.language || 'eng';
+  const isMp4 = /\.(mp4|m4v|mov)$/i.test(output);
+  const keepOrig = opts.keepOriginalAudio !== false;
+  const args = [...ffBase(), '-i', video, '-i', narrationWav];
+  if (subtitlesSrt) { args.push('-i', subtitlesSrt); }
+  args.push('-map', '0:v?', '-map', '1:a');
+  if (keepOrig) { args.push('-map', '0:a?'); }
+  if (subtitlesSrt) { args.push('-map', '2:0'); }
+  args.push(
+    '-c:v', 'copy',
+    '-c:a:0', 'aac', '-b:a:0', '192k',
+    '-metadata:s:a:0', `language=${lang}`,
+    '-metadata:s:a:0', 'title=Narration (cloned voice)',
+    '-metadata:s:a:0', 'handler_name=Narration (cloned voice)',
+    '-disposition:a:0', 'default',
+  );
+  if (keepOrig) {
+    args.push('-c:a:1', 'copy', '-disposition:a:1', '0');
+  }
+  if (subtitlesSrt) {
+    args.push(
+      '-c:s', isMp4 ? 'mov_text' : 'srt',
+      '-metadata:s:s:0', `language=${lang}`,
+      '-metadata:s:s:0', 'title=Transcript',
+      '-metadata:s:s:0', 'handler_name=Transcript',
+      '-disposition:s:0', 'default',
+    );
+  }
+  if (isMp4) { args.push('-movflags', '+faststart'); }
+  args.push(output);
+  return args;
+}
+
 // ---------- Effect catalogue for "Apply Effects" ----------
 
 export interface EffectParam { key: string; label: string; default: number | string; }

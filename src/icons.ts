@@ -61,6 +61,9 @@ export const ICONS: Record<string, string> = {
   'chevrons-down': 'M7 6l5 5 5-5M7 13l5 5 5-5',
   'wand': 'M4 20L15 9M14 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 10l.6 1.4 1.4.6-1.4.6L19 14l-.6-1.4-1.4-.6 1.4-.6z',
   'close': 'M6 6l12 12M18 6L6 18',
+  'screen-record': 'M3 5h18v12H3zM8 21h8M12 17v4M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+  'key': 'M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4',
+  'save': 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8',
 };
 
 /** Hidden SVG sprite: inlined once in the webview HTML; buttons reference it with <use href="#sl-name">. */

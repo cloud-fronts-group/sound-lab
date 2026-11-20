@@ -3,7 +3,8 @@
   "displayName": "Sound Lab — FFmpeg Audio Toolkit",
   "description": "Sound sampling, slicing, loudness, effects, spectrograms and speech-to-text transcription in VS Code, powered by FFmpeg.",
   "version": "0.1.0",
-  "publisher": "sound-lab",
+  "publisher": "cloud-fronts-group",
+  "author": "cloud-fronts-group",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
@@ -520,6 +521,33 @@
           "light": "media/icons/no-vocals-light.svg",
           "dark": "media/icons/no-vocals-dark.svg"
         }
+      },
+      {
+        "command": "soundLab.newPresentation",
+        "title": "New Presentation & Tutorial (ADK + Voice Clone)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/presentation-light.svg",
+          "dark": "media/icons/presentation-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.recordTutorial",
+        "title": "Record Live Tutorial (Screen / Slides + Voice Clone)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/screen-record-light.svg",
+          "dark": "media/icons/screen-record-dark.svg"
+        }
+      },
+      {
+        "command": "soundLab.setGeminiApiKey",
+        "title": "Set Gemini API Key (Deep Research / ADK)",
+        "category": "Sound Lab",
+        "icon": {
+          "light": "media/icons/key-light.svg",
+          "dark": "media/icons/key-dark.svg"
+        }
       }
     ],
     "submenus": [
@@ -637,6 +665,16 @@
           "when": "explorerResourceIsFolder"
         },
         {
+          "command": "soundLab.newPresentation",
+          "group": "7_folder@4",
+          "when": "explorerResourceIsFolder"
+        },
+        {
+          "command": "soundLab.recordTutorial",
+          "group": "7_folder@5",
+          "when": "explorerResourceIsFolder"
+        },
+        {
           "command": "soundLab.mlxSeparate",
           "group": "5_speech@3",
           "when": "!explorerResourceIsFolder"
@@ -732,6 +770,21 @@
           "command": "soundLab.mlxStopStudio",
           "when": "view == soundLab.mlxPanel",
           "group": "more@3"
+        },
+        {
+          "command": "soundLab.newPresentation",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@4"
+        },
+        {
+          "command": "soundLab.recordTutorial",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@5"
+        },
+        {
+          "command": "soundLab.setGeminiApiKey",
+          "when": "view == soundLab.mlxPanel",
+          "group": "more@6"
         }
       ],
       "view/item/context": [
@@ -1225,6 +1278,49 @@
           ],
           "default": "auto",
           "description": "How DJ: Acapella / Instrumental and Mashup split vocals from music."
+        },
+        "soundLab.adk.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to a Python interpreter with google-adk and google-genai installed (leave blank to auto-detect adk/.venv)."
+        },
+        "soundLab.adk.deepResearchAgent": {
+          "type": "string",
+          "default": "deep-research-preview-04-2026",
+          "enum": [
+            "deep-research-preview-04-2026",
+            "deep-research-max-preview-04-2026"
+          ],
+          "description": "Gemini Deep Research agent model used by Google ADK to synthesize presentation research."
+        },
+        "soundLab.adk.model": {
+          "type": "string",
+          "default": "gemini-4-hydrogen",
+          "description": "Gemini model used by Google ADK coordination and synthesis agents."
+        },
+        "soundLab.presentation.defaultMinutes": {
+          "type": "number",
+          "default": 7,
+          "minimum": 5,
+          "maximum": 10,
+          "description": "Default target duration (5–10 minutes) when scaffolding an instructional presentation."
+        },
+        "soundLab.presentation.embedSubtitles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write .srt/.vtt/.txt/.json transcript sidecars and mux mov_text subtitles when rendering video presentations."
+        },
+        "soundLab.record.screenDevice": {
+          "type": "string",
+          "default": "",
+          "description": "Screen capture device id or index for live tutorial recording (empty = auto-detect, e.g. avfoundation Capture screen 0)."
+        },
+        "soundLab.record.chunkSeconds": {
+          "type": "number",
+          "default": 8,
+          "minimum": 3,
+          "maximum": 30,
+          "description": "Rolling audio segment length in seconds for simultaneous live transcription and voice cloning while recording."
         }
       }
     }

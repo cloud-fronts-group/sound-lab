@@ -13,7 +13,7 @@
 
   $('text').value = saved.text || '';
   $('text').addEventListener('input', () => vscode.setState({ ...vscode.getState(), text: $('text').value }));
-  for (const [id, type] of [['start', 'start'], ['stop', 'stop'], ['studio', 'studio'], ['modelsBtn', 'models'], ['refresh', 'refresh'], ['cloneBtn', 'clone'], ['transcribe', 'transcribe'], ['separate', 'separate']]) {
+  for (const [id, type] of [['start', 'start'], ['stop', 'stop'], ['studio', 'studio'], ['modelsBtn', 'models'], ['refresh', 'refresh'], ['cloneBtn', 'clone'], ['presBtn', 'presentation'], ['recTutBtn', 'recordTutorial'], ['transcribe', 'transcribe'], ['separate', 'separate']]) {
     $(id).addEventListener('click', () => send(type));
   }
   $('speed').addEventListener('input', () => { $('speedVal').textContent = `${Number($('speed').value).toFixed(2)}×`; });

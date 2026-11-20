@@ -16,3 +16,7 @@ plugins/**
 scripts/**
 Formula/**
 notebooks/**
+adk/.venv/**
+adk/.pytest_cache/**
+adk/tests/**
+adk/**/__pycache__/**

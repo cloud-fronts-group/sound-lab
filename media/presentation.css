@@ -1,0 +1,17 @@
+/* Presentation & Tutorial Studio styles (VS Code theme variables only) */
+.pres-wrap { max-width: 980px; margin: 0 auto; }
+.pres-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.slide-card { border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; background: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.06)); }
+.slide-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.slide-stage { border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 4px; padding: 16px; background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.08)); }
+.slide-stage h3 { font-size: 1.25em; margin-bottom: 8px; }
+.slide-stage ul { margin: 6px 0 10px 18px; padding: 0; }
+.slide-stage pre { background: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.25)); padding: 10px; border-radius: 4px; overflow: auto; font-size: 0.9em; }
+.live-feed { max-height: 200px; overflow: auto; border: 1px solid var(--border); border-radius: 4px; padding: 8px; font-family: var(--vscode-editor-font-family, monospace); font-size: 0.9em; display: flex; flex-direction: column; gap: 4px; }
+.live-line { display: flex; gap: 8px; }
+.live-ts { color: var(--accent); flex: none; }
+.badge-ok { background: rgba(115, 201, 145, 0.2); color: var(--ok); }
+.badge-warn { background: rgba(204, 167, 0, 0.2); color: var(--warn); }
+video.preview { width: 100%; max-height: 360px; margin-top: 8px; border-radius: 4px; background: #000; }
+.w90 { width: 90px; }
+.w160 { width: 160px; }

@@ -70,7 +70,8 @@ export function run(opts: RunOptions): Promise<RunResult> {
       cancelled = true;
       if (opts.gracefulStop && child.stdin && !child.stdin.destroyed) {
         child.stdin.write('q\n');
-        setTimeout(() => { if (child.exitCode === null) { child.kill(); } }, 4000);
+        const t = setTimeout(() => { if (child.exitCode === null) { child.kill(); } }, 4000);
+        t.unref?.();
       } else {
         child.kill();
       }

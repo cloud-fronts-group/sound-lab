@@ -112,6 +112,7 @@ export class VoiceCloneWizard {
     <div class="row"><label><input type="radio" name="psrc" value="file"> Script file (.txt / .md)</label></div>
     <div class="row"><label><input type="radio" name="psrc" value="editor"> Text in the active editor</label></div>
     <div class="row"><button data-pick="presentation">${icon('folder')}Choose file…</button><span id="pick-presentation" class="small muted"></span></div>
+    <div class="row mt8"><button id="openPresStudio" class="link">${icon('presentation')}Initialize a 5–10 min presentation with Deep Research &amp; Slides…</button></div>
   </div>
 
   <div id="form-audiobook" class="card" hidden>
@@ -187,6 +188,7 @@ Lose yourself in the sound
       case 'create': await this.create(m as any); break;
       case 'open': await openMedia(vscode.Uri.file(m.path)); break;
       case 'reveal': await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(m.path)); break;
+      case 'openPresStudio': await vscode.commands.executeCommand('soundLab.newPresentation'); break;
     }
   }
 
@@ -299,14 +301,13 @@ Lose yourself in the sound
           const segs: Segment[] = tr.segments.length ? tr.segments : [{ start: 0, end: s.duration, text: tr.text }];
           const base = path.parse(m.file).name;
           fs.writeFileSync(path.join(out, `${base} (transcript).srt`), toSrt(segs));
-          const r = await VC.renderPresentation(t, segs, out, speak, { ...hooks, video: s.hasVideo ? m.file : undefined, baseName: base, lang: tr.language });
+          const r = await VC.renderPresentation(t, segs, out, speak, { ...hooks, video: s.hasVideo ? m.file : undefined, baseName: base, lang: tr.language, embedSubtitles: cfg().get<boolean>('presentation.embedSubtitles') !== false });
           if (r.pushed) { log(`${r.pushed} narrated line(s) ran longer than the original and were pushed later.`); }
-          return [r.video, r.narration, path.join(out, `${base} (transcript).srt`)].filter((x): x is string => !!x);
+          return [r.video, r.narration, ...r.transcripts, path.join(out, `${base} (transcript).srt`)].filter((x): x is string => !!x);
         }
         const src = m.source === 'editor' ? editorText() : (() => { if (!m.file) { throw new Error('Choose a script.'); } return { text: fs.readFileSync(m.file, 'utf8'), base: path.parse(m.file).name }; })();
         const r = await VC.renderPresentation(t, src.text, out, speak, { ...hooks, baseName: src.base });
-        fs.writeFileSync(path.join(out, `${src.base} (narration).srt`), toSrt(r.timeline));
-        return [r.narration, path.join(out, `${src.base} (narration).srt`)];
+        return [r.narration, ...r.transcripts];
       }
       if (!m.file) { throw new Error('Choose the instrumental.'); }
       const bpm = Number(m.bpm) || 90;

@@ -136,7 +136,8 @@ function capabilities(ffmpeg, ffprobe, refresh = false) {
   else {
     caps.ffmpeg = /ffmpeg version (\S+)/.exec(v.stdout)?.[1] ?? 'unknown';
     for (const l of sync(ffmpeg, ['-hide_banner', '-encoders']).stdout.split('\n')) { const m = /^\s[A-Z.]{6}\s+(\S+)/.exec(l); if (m) { caps.encoders.add(m[1]); } }
-    for (const l of sync(ffmpeg, ['-hide_banner', '-filters']).stdout.split('\n')) { const m = /^\s[.TSC|]{3}\s+(\w+)\s/.exec(l); if (m) { caps.filters.add(m[1]); } }
+    // flag column: 3 chars up to ffmpeg 8 (" T.. abench"), 2 chars from ffmpeg 9 (" TS aap", " .. abench")
+    for (const l of sync(ffmpeg, ['-hide_banner', '-filters']).stdout.split('\n')) { const m = /^\s[.TSC|]{2,3}\s+(\w+)\s/.exec(l); if (m) { caps.filters.add(m[1]); } }
     for (const l of sync(ffmpeg, ['-hide_banner', '-hwaccels']).stdout.split('\n').slice(1)) { if (l.trim()) { caps.hwaccels.add(l.trim()); } }
   }
   const p = sync(ffprobe, ['-hide_banner', '-version']);

@@ -251,7 +251,7 @@ All three backends return the same `Segment[]` (`start`, `end` in seconds, `text
 | API key | VS Code secret storage, key `soundLab.transcription.apiKey` | Until you remove it with **Set Transcription API Key** and empty input |
 | Settings | VS Code settings (`soundLab.*`) | Yours |
 
-`<global storage>` is the extension's `globalStorageUri` folder. For this extension it is typically `~/Library/Application Support/Code/User/globalStorage/sound-lab.sound-lab` on macOS, `~/.config/Code/User/globalStorage/sound-lab.sound-lab` on Linux and `%APPDATA%\Code\User\globalStorage\sound-lab.sound-lab` on Windows. The code contains no cache pruning, so delete `preview/` and `spectrograms/` yourself if they grow.
+`<global storage>` is the extension's `globalStorageUri` folder. For this extension it is typically `~/Library/Application Support/Code/User/globalStorage/cloud-fronts-group.sound-lab` on macOS, `~/.config/Code/User/globalStorage/cloud-fronts-group.sound-lab` on Linux and `%APPDATA%\Code\User\globalStorage\cloud-fronts-group.sound-lab` on Windows. The code contains no cache pruning, so delete `preview/` and `spectrograms/` yourself if they grow.
 
 ## 12. Ordering and concurrency
 

@@ -85,7 +85,7 @@ node scripts/keyboard-synth.js --keymap
 
 ## Development
 ```bash
-npm test         # 23 tests: MCP protocol + jobs against real ffmpeg, MLX service lifecycle via mock server & fake docker/podman/container CLIs, hooks, dubbing, SFX, synth
+npm test         # 25 tests: MCP protocol + jobs against real ffmpeg, MLX service lifecycle via mock server & fake docker/podman/container CLIs, native-mode server discovery, hooks, dubbing, SFX, synth
 npm run validate # claude plugin validate (plugin + marketplace)
 SOUND_LAB_TEST_MLX_URL=http://127.0.0.1:8000 npm test            # also hit a real mlx-audio server
 SOUND_LAB_TEST_CUDA_PYTHON=/venv-with-mlx-cuda12/bin/python npm test  # real mlx[cuda12] start-up check

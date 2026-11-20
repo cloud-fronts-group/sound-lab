@@ -15,6 +15,7 @@ const { JobManager } = require('./lib/jobs');
 const { MlxService } = require('./lib/mlx');
 const whisper = require('./lib/whisper');
 const Sub = require('./lib/subtitles');
+const Pres = require('./lib/presentation');
 
 const VERSION = '0.1.0';
 const env = process.env;
@@ -202,7 +203,7 @@ const handlers = {
   async tts(it, ctx) {
     await ensureMlx(ctx.signal);
     ctx.onProgress(0.1);
-    const r = await mlx.synthesize(it.text, it.output, { model: it.model, voice: it.voice, speed: it.speed, langCode: it.lang_code, instruct: it.instruct, signal: ctx.signal });
+    const r = await mlx.synthesize(it.text, it.output, { model: it.model, voice: it.voice, speed: it.speed, langCode: it.lang_code, refAudio: it.ref_audio, refText: it.ref_text, instruct: it.instruct, signal: ctx.signal });
     return { ...r, ...(await verifyOutput(it.output)) };
   },
 
@@ -210,6 +211,78 @@ const handlers = {
     await ensureMlx(ctx.signal);
     ctx.onProgress(0.05);
     return mlx.separate(it.input, it.target, it.residual, { model: it.model, description: it.description, signal: ctx.signal });
+  },
+
+  async presentation_overlay(it, ctx) {
+    await ensureMlx(ctx.signal);
+    const spec = JSON.parse(fs.readFileSync(path.join(it.presentationDir, 'presentation.json'), 'utf8'));
+    if (!spec.slides?.length) { throw new Error('presentation.json has no slides.'); }
+    const outDir = path.resolve(it.outputDir || it.presentationDir);
+    const baseName = it.baseName || Pres.slug(spec.title);
+    const work = path.join(outDir, `.${baseName}-overlay-work`);
+    fs.mkdirSync(work, { recursive: true });
+    try {
+      const chunks = [];
+      let cursor = 0.4;
+      for (let i = 0; i < spec.slides.length; i++) {
+        const s = spec.slides[i];
+        const text = String(s.narration || s.title).trim();
+        const wav = path.join(work, `slide_${String(i + 1).padStart(3, '0')}.wav`);
+        await mlx.synthesize(text, wav, { model: it.model, voice: it.voice, refAudio: it.refAudio, refText: it.refText, signal: ctx.signal });
+        const pr = await probe(CFG.ffprobe, wav);
+        const start = i === 0 ? 0.4 : cursor;
+        const end = start + Math.max(0.5, pr.duration || 1);
+        chunks.push({ file: wav, start, end, text, title: s.title });
+        cursor = end + 0.65;
+        ctx.onProgress(0.1 + 0.65 * ((i + 1) / spec.slides.length));
+      }
+      const totalDur = cursor + 0.6;
+      const narration = uniquePath(path.join(outDir, `${baseName} (narration).wav`), false);
+      const mixArgs = ['-hide_banner', '-nostdin', '-y'];
+      chunks.forEach(c => mixArgs.push('-i', c.file));
+      const parts = chunks.map((c, i) => `[${i}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=mono,adelay=${Math.round(c.start * 1000)}:all=1[n${i}]`);
+      const graph = `${parts.join(';')};${chunks.map((_, i) => `[n${i}]`).join('')}amix=inputs=${chunks.length}:duration=longest:normalize=0,apad=whole_dur=${totalDur.toFixed(3)},highpass=f=70,acompressor=threshold=0.12:ratio=2.5:attack=8:release=120,loudnorm=I=-16:TP=-1.5:LRA=9,aresample=48000[out]`;
+      const mixRes = await run(CFG.ffmpeg, [...mixArgs, '-filter_complex', graph, '-map', '[out]', '-c:a', 'pcm_s24le', narration], { signal: ctx.signal, onLine: ctx.onLog });
+      if (mixRes.cancelled) { throw new Error('Cancelled'); }
+      if (mixRes.code !== 0) { throw new Error(`ffmpeg narration mix exited ${mixRes.code}: ${tail(mixRes.stderr, 4)}`); }
+      ctx.onProgress(0.8);
+
+      const timeline = chunks.map(c => ({ start: c.start, end: c.end, text: c.text }));
+      const transcriptObj = { source: spec.title, backend: 'mlx-audio-voice-clone', language: it.language || 'eng', createdAt: new Date().toISOString(), segments: timeline };
+      const transcripts = ['srt', 'vtt', 'txt', 'json'].map(fmt => {
+        const f = uniquePath(path.join(outDir, `${baseName} (transcript).${fmt}`), false);
+        fs.writeFileSync(f, Sub.render(fmt, transcriptObj), 'utf8');
+        return f;
+      });
+      const srtPath = transcripts.find(f => f.endsWith('.srt'));
+
+      const slideImgs = Pres.writeSlidePngs(spec.slides, path.join(outDir, 'slides-frames'));
+      const concatFile = path.join(work, 'slides.ffconcat');
+      const concatLines = ['ffconcat version 1.0'];
+      chunks.forEach((c, i) => {
+        const nextAt = i + 1 < chunks.length ? chunks[i + 1].start - 0.25 : totalDur;
+        const span = Math.max(0.5, nextAt - (i === 0 ? 0 : c.start - 0.25));
+        concatLines.push(`file '${slideImgs[i].replace(/'/g, `'\\''`)}'`, `duration ${span.toFixed(3)}`);
+      });
+      concatLines.push(`file '${slideImgs[slideImgs.length - 1].replace(/'/g, `'\\''`)}'`);
+      fs.writeFileSync(concatFile, concatLines.join('\n') + '\n');
+
+      const video = uniquePath(path.join(outDir, `${baseName} (tutorial).mp4`), false);
+      const vidArgs = [
+        '-hide_banner', '-nostdin', '-y', '-f', 'concat', '-safe', '0', '-i', concatFile, '-i', narration, '-i', srtPath,
+        '-map', '0:v:0', '-map', '1:a:0', '-map', '2:0',
+        '-vf', 'fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p',
+        '-c:v', 'libx264', '-tune', 'stillimage', '-crf', '20', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '192k', `-metadata:s:a:0`, `language=${it.language || 'eng'}`, '-metadata:s:a:0', 'title=Narration (cloned voice)', '-metadata:s:a:0', 'handler_name=Narration (cloned voice)', '-disposition:a:0', 'default',
+        '-c:s', 'mov_text', `-metadata:s:s:0`, `language=${it.language || 'eng'}`, '-metadata:s:s:0', 'title=Transcript', '-metadata:s:s:0', 'handler_name=Transcript', '-disposition:s:0', 'default',
+        '-movflags', '+faststart', '-shortest', video,
+      ];
+      await runFfmpegInvocation(vidArgs, { reads: [concatFile, narration, srtPath, ...slideImgs], writes: [video] }, { ...ctx, onProgress: f => ctx.onProgress(0.82 + f * 0.18) }, totalDur);
+      const checked = await verifyOutput(video);
+      return { ...checked, video, narration, transcripts, slides: slideImgs.length, vcodec: checked.video, acodec: checked.audio };
+    } finally {
+      fs.rmSync(work, { recursive: true, force: true });
+    }
   },
 };
 
@@ -407,6 +480,8 @@ const TOOLS = [
         model: str('TTS model id (default from settings, e.g. mlx-community/Kokoro-82M-bf16)'),
         speed: { type: 'number', minimum: 0.5, maximum: 2 },
         lang_code: str('Kokoro language code: a (US English), b (UK), e (es), f (fr), h (hi), i (it), j (ja), p (pt-br), z (zh)'),
+        ref_audio: str('Reference audio file path for zero-shot voice cloning (e.g. with Chatterbox or Qwen3-TTS Base)'),
+        ref_text: str('Exact transcript of ref_audio for zero-shot voice cloning'),
         instruct: str('Style instruction for models that support it'),
       },
       required: ['text', 'output'],
@@ -500,6 +575,94 @@ const TOOLS = [
     description: 'Re-queue the failed, cancelled or interrupted items of a job.',
     inputSchema: { type: 'object', properties: { job_id: str('Job id') }, required: ['job_id'] },
     handler: async ({ job_id }) => jobs.resume(job_id),
+  },
+  {
+    name: 'scaffold_presentation',
+    description: 'Scan a workspace folder and scaffold a 5-10 minute instructional slide presentation (presentation.json, slides.md, slides.html, narration-script.txt, research-report.md). Call after initializing/cloning the presenter voice and collecting topic + folder.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        folder_path: str('Project folder path to analyze'),
+        topic: str('Presentation topic'),
+        title: str('Optional presentation title'),
+        output_dir: str('Directory where scaffold files will be written'),
+        target_minutes: { type: 'number', minimum: 5, maximum: 10, description: 'Target presentation duration in minutes (5-10, default 7)' },
+        audience: str('Target audience (default Developers)'),
+        voice_profile_id: str('Selected or cloned voice profile identifier'),
+        research_report: str('Optional Markdown Deep Research report to synthesize into slides'),
+      },
+      required: ['folder_path', 'topic'],
+    },
+    handler: async (a) => {
+      const folderContext = Pres.scanFolderContext(a.folder_path);
+      const outDir = a.output_dir ? path.resolve(a.output_dir) : path.join(path.resolve(a.folder_path), 'presentations', Pres.slug(a.topic));
+      return Pres.scaffoldPresentation({
+        outputDir: outDir,
+        title: a.title || a.topic,
+        topic: a.topic,
+        folderContext,
+        targetMinutes: a.target_minutes,
+        audience: a.audience || 'Developers',
+        voiceProfileId: a.voice_profile_id,
+        researchReport: a.research_report,
+      });
+    },
+  },
+  {
+    name: 'overlay_presentation',
+    description: 'Render PNG slide images, synthesize cloned-voice narration per slide via mlx-audio, write .srt/.vtt/.txt/.json transcripts, and mux into an MP4 tutorial with embedded mov_text subtitles. Runs as a background job.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        presentation_dir: str('Directory containing presentation.json'),
+        output_dir: str('Output directory (default: presentation_dir)'),
+        base_name: str('Base filename for outputs'),
+        model: str('Voice cloning / TTS model id (default mlx-community/chatterbox-turbo-4bit)'),
+        voice: str('Preset voice id when not cloning from ref_audio'),
+        ref_audio: str('Reference WAV file path of the user voice to clone'),
+        ref_text: str('Transcript of ref_audio'),
+        language: str('ISO-639-2 language code for tracks/subtitles (default eng)'),
+      },
+      required: ['presentation_dir'],
+    },
+    handler: async (a) => {
+      const presDir = path.resolve(a.presentation_dir);
+      const job = jobs.create('presentation_overlay', `overlay presentation ${path.basename(presDir)}`, [{
+        type: 'presentation_overlay',
+        presentationDir: presDir,
+        outputDir: a.output_dir,
+        baseName: a.base_name,
+        model: a.model || 'mlx-community/chatterbox-turbo-4bit',
+        voice: a.voice,
+        refAudio: a.ref_audio,
+        refText: a.ref_text,
+        language: a.language || 'eng',
+      }]);
+      return { job_id: job.id, presentation_dir: presDir };
+    },
+  },
+  {
+    name: 'record_screen_plan',
+    description: 'Plan simultaneous screen recording + rolling 16 kHz mono WAV chunking so live transcription and voice cloning can run while presenting, plus final tutorial mux steps.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: str('Capture MP4 path'),
+        video_device: str('Platform screen capture device id (e.g. avfoundation index "1", "desktop", ":0.0")'),
+        audio_device: str('Platform mic capture device id'),
+        chunk_dir: str('Directory for rolling WAV chunks'),
+        chunk_seconds: { type: 'number', minimum: 2, maximum: 30, description: 'Rolling audio chunk length in seconds (default 8)' },
+        fps: { type: 'number', minimum: 5, maximum: 60 },
+      },
+    },
+    handler: async (a) => Pres.recordScreenPlan({
+      output: a.output,
+      videoDevice: a.video_device,
+      audioDevice: a.audio_device,
+      chunkDir: a.chunk_dir,
+      chunkSeconds: a.chunk_seconds,
+      fps: a.fps,
+    }),
   },
 ];
 const TOOL_MAP = new Map(TOOLS.map(t => [t.name, t]));

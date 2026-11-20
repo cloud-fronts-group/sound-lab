@@ -19,7 +19,7 @@ test('protocol: initialize, tools/list, ping, unknown tool/method', async () => 
   assert.ok(init.capabilities.tools);
   const tools = (await c.request('tools/list')).result.tools;
   const names = tools.map(t => t.name);
-  for (const n of ['capabilities', 'list_presets', 'probe', 'batch_convert', 'run_ffmpeg', 'transcribe', 'synthesize_speech', 'separate_audio', 'mlx_service', 'job_status', 'wait_job', 'list_jobs', 'cancel_job', 'resume_job']) {
+  for (const n of ['capabilities', 'list_presets', 'probe', 'batch_convert', 'run_ffmpeg', 'transcribe', 'synthesize_speech', 'separate_audio', 'mlx_service', 'job_status', 'wait_job', 'list_jobs', 'cancel_job', 'resume_job', 'scaffold_presentation', 'overlay_presentation', 'record_screen_plan']) {
     assert.ok(names.includes(n), n);
   }
   for (const t of tools) { assert.equal(t.inputSchema.type, 'object', t.name); assert.ok(t.description.length > 30, t.name); }
@@ -164,5 +164,31 @@ test('docker runner: paths are bind-mounted and rewritten (fake docker shim runs
   assert.ok(vols.some(v => v.startsWith(path.join(work, 'dock out') + ':/mnt/sl') && !v.endsWith(':ro')), 'output dir mounted rw');
   const after = a.slice(a.indexOf('ffmpeg') + 1);
   assert.ok(after.every(x => !x.startsWith(work)), 'no host paths leak into the container argv');
+  await c.close();
+});
+
+test('scaffold_presentation and record_screen_plan produce 5-10 min deck files and dual-output ffmpeg plan', async () => {
+  const proj = path.join(work, 'pres-proj');
+  fs.mkdirSync(path.join(proj, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'README.md'), '# Demo Project\nInstructional walkthrough source.\n');
+  fs.writeFileSync(path.join(proj, 'src', 'main.js'), 'function greet() { return "hi"; }\nmodule.exports = { greet };\n');
+  const deckOut = path.join(work, 'pres-deck');
+  const c = new McpClient(env); await c.init();
+  const res = await c.call('scaffold_presentation', {
+    folder_path: proj,
+    topic: 'Demo Project Architecture',
+    output_dir: deckOut,
+    target_minutes: 7,
+    audience: 'Engineers',
+    voice_profile_id: 'me',
+  });
+  assert.equal(res.spec.targetMinutes, 7);
+  assert.ok(res.spec.estimatedSeconds >= 300 && res.spec.estimatedSeconds <= 600);
+  for (const f of Object.values(res.files)) { assert.ok(fs.existsSync(f), `missing ${f}`); }
+
+  const plan = await c.call('record_screen_plan', { output: path.join(work, 'cap.mp4'), chunk_seconds: 6 });
+  assert.ok(Array.isArray(plan.captureFfmpegArgs));
+  assert.ok(plan.captureFfmpegArgs.includes('-segment_time'));
+  assert.equal(plan.workflow.length, 3);
   await c.close();
 });

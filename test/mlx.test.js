@@ -10,6 +10,9 @@ const { spawn, execFileSync } = require('child_process');
 const { MlxAudioClient, StudioManager, normalizeTranscript, baseUrl } = require('../out/core/mlxAudio');
 const VC = require('../out/core/voiceClone');
 const T = require('../out/core/transcribe');
+const PRES = require('../out/core/presentation');
+const { LiveTutorialSession } = require('../out/core/liveTutorial');
+const { checkAdkRuntime, runPresentationResearchWorkflow } = require('../out/core/adkBridge');
 
 const FF = process.env.FFMPEG || 'ffmpeg';
 const FP = process.env.FFPROBE || 'ffprobe';
@@ -312,4 +315,179 @@ test('Studio prebuilt bundle (Homebrew): locate via launcher + studio.json api, 
     await assert.rejects(s3.start(broken, { timeoutMs: 10000 }), /Could not start mlx-audio Studio/);
     assert.equal(s3.running, false);
   } finally { s.stop(); s2?.stop(); }
+});
+
+test('presentation: folder scan, 5-10 min scaffold, and slide PNG + cloned-voice video with mov_text transcript', async () => {
+  const proj = p('sample-proj');
+  fs.mkdirSync(path.join(proj, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(proj, 'README.md'), '# Sample Audio Tool\n\nDemonstrates live voice cloning and instructional decks.\n');
+  fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify({ name: 'sample-audio-tool', dependencies: { typescript: '5.0.0' } }));
+  fs.writeFileSync(path.join(proj, 'src', 'index.ts'), 'export function main() { return "hello"; }\n');
+
+  const ctx = PRES.scanFolderContext(proj);
+  assert.ok(ctx.fileCount >= 3);
+  assert.ok(ctx.extensions['.ts'] >= 1);
+  assert.ok(ctx.docs.some(d => /Sample Audio Tool/.test(d.excerpt)));
+
+  const deckDir = p('deck-out');
+  const scaffold = PRES.scaffoldPresentation({
+    outputDir: deckDir,
+    title: 'Sample Audio Tool Walkthrough',
+    topic: 'Sample Audio Tool Architecture',
+    folderContext: ctx,
+    targetMinutes: 7,
+    audience: 'Contributors',
+    voiceProfileId: 'me',
+  });
+  assert.equal(scaffold.spec.targetMinutes, 7);
+  const pacing = PRES.validatePresentationDuration(scaffold.spec.slides);
+  assert.equal(pacing.withinTargetWindow, true, `expected 300..600s, got ${pacing.totalSeconds}s`);
+  for (const f of Object.values(scaffold.files)) { assert.ok(fs.existsSync(f), `missing scaffold file ${f}`); }
+
+  // Render a compact 2-slide version with the mock mlx-audio voice clone server + real ffmpeg
+  const ref = p('pres-ref.wav');
+  ff(['-f', 'lavfi', '-i', 'sine=f=240:d=1', ref]);
+  const speak = async (text, out) => {
+    fs.writeFileSync(out, await client.speech(text, { model: 'mlx-community/chatterbox-turbo-4bit', refAudio: ref, refText: 'reference voice sample' }));
+  };
+  const compactSpec = {
+    ...scaffold.spec,
+    slides: scaffold.spec.slides.slice(0, 2).map((s, i) => ({
+      ...s,
+      narration: `Slide ${i + 1}: ${s.title}. Let us inspect the layout.`,
+      durationSec: 3,
+    })),
+  };
+  const rendered = await VC.renderSlidePresentationVideo({ ffmpeg: FF, ffprobe: FP }, compactSpec, p('deck-video'), speak, { lang: 'eng' });
+  assert.equal(rendered.slideImages.length, 2);
+  assert.equal(rendered.transcripts.length, 4);
+  const streams = JSON.parse(execFileSync(FP, ['-v', 'error', '-show_streams', '-of', 'json', rendered.video]).toString()).streams;
+  assert.equal(streams.find(s => s.codec_type === 'video').codec_name, 'h264');
+  const aud = streams.filter(s => s.codec_type === 'audio');
+  assert.equal(aud.length, 1);
+  assert.equal(aud[0].tags.title ?? aud[0].tags.handler_name, 'Narration (cloned voice)');
+  assert.equal(aud[0].disposition.default, 1);
+  assert.equal(streams.find(s => s.codec_type === 'subtitle').codec_name, 'mov_text');
+});
+
+test('live tutorial: simultaneous screen recording, rolling transcription, voice cloning, and mov_text mux', async () => {
+  const ref = p('live-screen-ref.wav');
+  ff(['-f', 'lavfi', '-i', 'sine=f=220:d=1', ref]);
+  const events = { transcripts: 0, cloned: 0 };
+  const sess = new LiveTutorialSession({
+    tools: { ffmpeg: FF, ffprobe: FP },
+    outDir: p('live-screen'),
+    baseName: 'screen-demo',
+    mode: 'screen',
+    platform: 'linux',
+    videoFormat: 'lavfi',
+    videoDevice: 'testsrc2=size=320x240:rate=15',
+    audioFormat: 'lavfi',
+    audioDevice: 'sine=f=330:r=16000',
+    fps: 15,
+    chunkSeconds: 2,
+    transcribeChunk: (wav, sig) => client.transcribe(wav, { model: 'mlx-community/whisper-large-v3-turbo', signal: sig }),
+    speak: async (text, out, sig) => {
+      fs.writeFileSync(out, await client.speech(text, { model: 'mlx-community/chatterbox-turbo-4bit', refAudio: ref, refText: 'ref', signal: sig }));
+    },
+  });
+  sess.on('transcript', () => { events.transcripts += 1; });
+  sess.on('cloned', () => { events.cloned += 1; });
+
+  await sess.start();
+  await new Promise(r => setTimeout(r, 3200));
+  sess.markSlide(1, 'Demo Step 2');
+  const res = await sess.stopAndFinalize();
+
+  assert.ok(events.transcripts >= 1, 'live transcription fired during recording');
+  assert.ok(events.cloned >= 1, 'concurrent voice cloning fired during recording');
+  assert.ok(res.segments.length >= 1, 'transcript segments accumulated');
+  assert.equal(res.transcripts.length, 4);
+  for (const tf of res.transcripts) { assert.ok(fs.existsSync(tf)); }
+  assert.ok(res.slideMarks.some(m => m.slideIndex === 1 && m.title === 'Demo Step 2'));
+
+  const streams = JSON.parse(execFileSync(FP, ['-v', 'error', '-show_streams', '-of', 'json', res.video]).toString()).streams;
+  assert.equal(streams.find(s => s.codec_type === 'video').codec_name, 'h264');
+  const aud = streams.filter(s => s.codec_type === 'audio');
+  assert.equal(aud.length, 2, 'cloned voice track + original capture audio');
+  assert.equal(aud[0].tags.title ?? aud[0].tags.handler_name, 'Narration (cloned voice)');
+  assert.equal(aud[0].disposition.default, 1);
+  assert.equal(streams.find(s => s.codec_type === 'subtitle').codec_name, 'mov_text');
+});
+
+test('live tutorial: slide presentation recording with concurrent transcription + voice clone overlay', async () => {
+  const ref = p('live-slides-ref.wav');
+  ff(['-f', 'lavfi', '-i', 'sine=f=220:d=1', ref]);
+  const spec = {
+    title: 'Live Slide Deck',
+    topic: 'Live Slides',
+    folderPath: p('sample-proj'),
+    targetMinutes: 5,
+    estimatedSeconds: 300,
+    slides: [
+      { index: 1, title: 'Opening', bullets: ['Initialize voice', 'Set topic'], narration: 'Welcome.', durationSec: 2 },
+      { index: 2, title: 'Architecture', bullets: ['ADK agents', 'MLX audio'], narration: 'Deep dive.', durationSec: 2 },
+    ],
+  };
+  const sess = new LiveTutorialSession({
+    tools: { ffmpeg: FF, ffprobe: FP },
+    outDir: p('live-slides'),
+    baseName: 'slides-demo',
+    mode: 'slides',
+    audioFormat: 'lavfi',
+    audioDevice: 'sine=f=440:r=16000',
+    chunkSeconds: 2,
+    presentation: spec,
+    transcribeChunk: (wav, sig) => client.transcribe(wav, { model: 'mlx-community/whisper-large-v3-turbo', signal: sig }),
+    speak: async (text, out, sig) => {
+      fs.writeFileSync(out, await client.speech(text, { model: 'mlx-community/chatterbox-turbo-4bit', refAudio: ref, refText: 'ref', signal: sig }));
+    },
+  });
+
+  await sess.start();
+  await new Promise(r => setTimeout(r, 1500));
+  sess.markSlide(1);
+  await new Promise(r => setTimeout(r, 1600));
+  const res = await sess.stopAndFinalize();
+
+  assert.equal(res.slideMarks.length, 2);
+  assert.ok(fs.existsSync(res.video));
+  const streams = JSON.parse(execFileSync(FP, ['-v', 'error', '-show_streams', '-of', 'json', res.video]).toString()).streams;
+  assert.equal(streams.find(s => s.codec_type === 'video').codec_name, 'h264');
+  assert.equal(streams.filter(s => s.codec_type === 'audio').length, 1);
+  assert.equal(streams.find(s => s.codec_type === 'subtitle').codec_name, 'mov_text');
+});
+
+test('adkBridge: runtime detection and local-folder-scaffold fallback without API key', async () => {
+  const root = path.resolve(__dirname, '..');
+  const rt = checkAdkRuntime(root);
+  if (fs.existsSync(path.join(root, 'adk', '.venv'))) {
+    assert.equal(rt.available, true, rt.reason);
+    assert.ok(rt.adkVersion);
+  }
+  const prevG = process.env.GEMINI_API_KEY;
+  const prevGoogle = process.env.GOOGLE_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.GOOGLE_API_KEY;
+  try {
+    const folder = p('adk-folder');
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, 'README.md'), '# ADK Demo Repo\nExplains multi-agent orchestration.');
+    const ctx = PRES.scanFolderContext(folder);
+    const out = await runPresentationResearchWorkflow({
+      extensionRoot: root,
+      topic: 'Google ADK Deep Research + MLX Audio',
+      folderPath: folder,
+      folderContext: ctx,
+      outputDir: p('adk-scaffold'),
+      targetMinutes: 8,
+    });
+    assert.equal(out.engine, 'local-folder-scaffold');
+    assert.equal(out.scaffold.spec.targetMinutes, 8);
+    assert.ok(fs.existsSync(out.scaffold.files.json));
+    assert.ok(fs.existsSync(out.scaffold.files.html));
+  } finally {
+    if (prevG !== undefined) { process.env.GEMINI_API_KEY = prevG; }
+    if (prevGoogle !== undefined) { process.env.GOOGLE_API_KEY = prevGoogle; }
+  }
 });
